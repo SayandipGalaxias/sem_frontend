@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -21,6 +22,7 @@ export default function LoginScreen() {
     const [error, setError] = useState('');
     const { login, loading } = useAuthApi();
     const router = useRouter();
+    const [showPass, setShowPass] = useState(false);
 
     const handleLogin = async () => {
         if (!email.trim()) {
@@ -61,7 +63,7 @@ export default function LoginScreen() {
                         <Text className='text-2xl lg:text-xl text-black dark:text-white font-semibold text-center'>Welcome Back to iSmart Manager, Sign In Now!</Text>
 
                         <View className='gap-7'>
-                            <View className='flex gap-2'>
+                            <View className='flex'>
                                 <Text className="text-lg lg:text-base font-medium text-black dark:text-gray-200">Email</Text>
                                 <TextInput
                                     className='bg-[#e8ecf4] dark:bg-gray-700 text-black dark:text-gray-200 placeholder:text-gray-400 rounded-[35px] p-4 text-lg lg:text-base'
@@ -77,20 +79,27 @@ export default function LoginScreen() {
                                 />
                             </View>
 
-                            <View className='flex gap-2'>
+                            <View className='flex'>
                                 <Text className="text-lg lg:text-base font-medium text-black dark:text-gray-200">Password</Text>
-                                <TextInput
-                                    className='bg-[#e8ecf4] dark:bg-gray-700 text-black dark:text-gray-200 placeholder:text-gray-400 rounded-[35px] p-4 text-lg lg:text-base'
-                                    placeholder={'MySecurePass'}
-                                    value={password}
-                                    onChangeText={(text) => {
-                                        setPassword(text);
-                                        setError('');
-                                    }}
-                                    autoCapitalize={'none'}
-                                    autoCorrect={false}
-                                    secureTextEntry
-                                />
+                                <View>
+                                    <TextInput
+                                        className='bg-[#e8ecf4] dark:bg-gray-700 text-black dark:text-gray-200 placeholder:text-gray-400 rounded-[35px] p-4 text-lg lg:text-base'
+                                        placeholder={'MySecurePass'}
+                                        value={password}
+                                        onChangeText={(text) => {
+                                            setPassword(text);
+                                            setError('');
+                                        }}
+                                        autoCapitalize={'none'}
+                                        autoCorrect={false}
+                                        secureTextEntry={showPass ? false : true}
+                                        textContentType="password"
+
+                                    />
+                                    <View className='absolute right-5 top-1/2 -translate-y-1/2'>
+                                        <Ionicons name="eye" size={20} color={Colors.black} className="" onPress={() => setShowPass(!showPass)} />
+                                    </View>
+                                </View>
                             </View>
                         </View>
 
