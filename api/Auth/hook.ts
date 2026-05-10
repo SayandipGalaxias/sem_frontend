@@ -29,7 +29,6 @@ export function useAuthApi() {
                 router.replace('/(dashboard)' as any);
             }
         } catch (error) {
-            console.log('LOGIN ERROR:', error);
             Toast.show({ type: 'error', text1: errorHandler(error) });
         } finally {
             setLoading(false);
@@ -45,12 +44,26 @@ export function useAuthApi() {
     async function register(email: string, password: string, payload: RegisterRequest) {
         setLoading(true);
         try {
-            const { data: { data: res } } = await AuthApi.register(payload);
-            await AsyncStorage.setItem(LocalStorageItems.TOKEN, res.token);
-            setUser({ email: payload.email, type: 'user' });
-            router.replace('/(dashboard)' as any);
-        } catch (error) {
-            Toast.show({ type: 'error', text1: errorHandler(error) });
+            const response = await AuthApi.register(payload);
+
+            if (!response.data?.success) {
+                Toast.show({ type: 'error', text1: 'Registration failed' });
+                return;
+            }
+
+            await login({ email: payload.email, password: payload.password });
+
+        } catch (error: any) {
+            const status = error?.response?.status;
+            const serverMessage = error?.response?.data?.message ?? error?.response?.data?.error;
+
+            const friendlyMessage =
+                status === 409 ? 'An account with this email already exists' :
+                    status === 500 ? (serverMessage ?? 'Server error, please try again later') :
+                        status === 400 ? (serverMessage ?? 'Invalid email or password') :
+                            serverMessage ?? 'Something went wrong';
+
+            Toast.show({ type: 'error', text1: friendlyMessage });
         } finally {
             setLoading(false);
         }

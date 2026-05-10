@@ -15,5 +15,5 @@ export interface RegisterRequest {
 }
 
 export interface RegisterResponse {
-    token: string;
+    // token: string;
 }
