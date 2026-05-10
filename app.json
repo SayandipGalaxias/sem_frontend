@@ -8,11 +8,17 @@
     "scheme": "secret-manager",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "We use Face ID to protect your secrets"
-      }
+      },
+      "bundleIdentifier": "com.anonymous.secretmanager"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +28,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.secretmanager"
     },
     "web": {
       "output": "static",

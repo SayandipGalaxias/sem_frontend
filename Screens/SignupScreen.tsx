@@ -1,28 +1,36 @@
-import { useAuthApi } from '@/api/Auth/hook';
-import CommonButton from '@/components/CommonButton';
-import { Colors } from '@/utils/colors';
-import { CommonStylesFn } from '@/utils/CommonStyles';
-import { Fonts } from '@/utils/Fonts';
-import { moderateScale, scale, verticalScale, widthPx } from '@/utils/Responsive';
-import { Utility } from '@/utils/Utility';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import {
+    ActivityIndicator,
+    Image,
+    KeyboardAvoidingView,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { useAuthApi } from '../api/Auth/hook';
+import '../global.css';
+import { Colors } from '../utils/colors';
+import { Utility } from '../utils/Utility';
 
-const Signup = () => {
+export default function SignupScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [showPass, setShowPass] = useState(false);
     const { register, loading } = useAuthApi();
     const router = useRouter();
 
     const handleSignUp = async () => {
-        if (!Utility.isEmailValid(email)) {
-            setError('Invalid email format');
-            return;
-        }
         if (!email.trim()) {
             setError('Email is required');
+            return;
+        }
+        if (!Utility.isEmailValid(email)) {
+            setError('Invalid email format');
             return;
         }
         if (!password.trim()) {
@@ -34,108 +42,93 @@ const Signup = () => {
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
-        >
-            <View style={styles.formContainer}>
-                <View style={styles.card}>
-                    <View style={styles.headerContainer}>
-                        <Text style={CommonStylesFn.text(4, Colors.white, Fonts.bold)}>{'Sign up to'}</Text>
-                        <Text style={CommonStylesFn.text(8, Colors.primary, Fonts.bold)}>
-                            {'Secret Manager'}
+        <View className="flex-1 bg-[#e8ecf4] dark:bg-black">
+            <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+                <ScrollView
+                    contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 48, paddingHorizontal: 16, }}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                >
+                    <View className='items-center gap-5 mb-16'>
+                        <View className='w-32 h-32 rounded-[35px]'>
+                            <Image source={require('../assets/images/app_icon.png')} style={{ height: "100%", width: "100%", borderRadius: 35 }} resizeMode='contain' />
+                        </View>
+                        <Text className='text-5xl text-[#0984e3] font-inter font-bold'>
+                            iSmart Manager
                         </Text>
                     </View>
-                    <View style={styles.inputContainer}>
-                        <TextInput
-                            style={styles.input}
-                            placeholder={'Enter email'}
-                            placeholderTextColor={Colors.textMuted}
-                            value={email}
-                            onChangeText={(text) => {
-                                setEmail(text);
-                                setError('');
-                            }}
-                            autoCapitalize={'none'}
-                            autoCorrect={false}
-                        />
-                        <TextInput
-                            style={styles.input}
-                            placeholder={'Enter password'}
-                            placeholderTextColor={Colors.textMuted}
-                            value={password}
-                            onChangeText={(text) => {
-                                setPassword(text);
-                                setError('');
-                            }}
-                            autoCapitalize={'none'}
-                            autoCorrect={false}
-                        />
+
+                    <View className='w-full lg:w-[700px] bg-white dark:bg-gray-900 rounded-[50px] p-10 gap-5'>
+                        <Text className='text-2xl lg:text-xl text-black dark:text-white font-semibold text-center'>
+                            Create your iSmart Account!
+                        </Text>
+
+                        <View className='gap-7'>
+                            <View>
+                                <Text className="text-lg lg:text-base font-medium text-black dark:text-gray-200">
+                                    Email
+                                </Text>
+                                <TextInput
+                                    className='bg-[#e8ecf4] dark:bg-gray-700 text-black dark:text-gray-200 placeholder:text-gray-400 rounded-[35px] p-4 text-lg lg:text-base'
+                                    placeholder='developers@galaxias.com'
+                                    value={email}
+                                    onChangeText={(text) => {
+                                        setEmail(text);
+                                        setError('');
+                                    }}
+                                    autoCapitalize='none'
+                                    autoCorrect={false}
+                                    keyboardType="email-address"
+                                    returnKeyType="next"
+                                />
+                            </View>
+
+                            <View>
+                                <Text className="text-lg lg:text-base font-medium text-black dark:text-gray-200">
+                                    Password
+                                </Text>
+                                <View>
+                                    <TextInput
+                                        className='bg-[#e8ecf4] dark:bg-gray-700 text-black dark:text-gray-200 placeholder:text-gray-400 rounded-[35px] p-4 text-lg lg:text-base'
+                                        placeholder='MySecurePass'
+                                        value={password}
+                                        onChangeText={(text) => {
+                                            setPassword(text);
+                                            setError('');
+                                        }}
+                                        autoCapitalize='none'
+                                        autoCorrect={false}
+                                        secureTextEntry={!showPass}
+                                        textContentType="password"
+                                        returnKeyType="done"
+                                        onSubmitEditing={handleSignUp}
+                                    />
+                                    <View className='absolute right-5 top-1/2 -translate-y-1/2'>
+                                        <Ionicons name={showPass ? "eye-off" : "eye"} size={20} color={Colors.black} onPress={() => setShowPass(!showPass)} />
+                                    </View>
+                                </View>
+                            </View>
+                        </View>
+
+                        {error ? (
+                            <Text className='text-red-500 text-center my-2'>{error}</Text>
+                        ) : null}
+
+                        <TouchableOpacity className='bg-[#0984e3] rounded-[35px] p-4 items-center mt-4' onPress={handleSignUp} disabled={loading}>
+                            {loading ? (
+                                <ActivityIndicator color={Colors.white} />
+                            ) : (
+                                <Text className='text-white font-bold text-xl lg:text-lg'>Sign Up</Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <Text className='text-gray-400 text-center mt-2' onPress={() => router.replace('/login')}>
+                            Already have an account?
+                        </Text>
                     </View>
-                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
-                    <CommonButton label={'Sign Up'} onPress={handleSignUp} containerStyle={styles.button} />
-                    <Text style={styles.signUpText} onPress={() => router.replace('/login')}>Already have an account?</Text>
-                </View>
-            </View>
-        </KeyboardAvoidingView>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </View>
     );
-};
-
-export default Signup;
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: Colors.background,
-        alignItems: 'center',
-    },
-    formContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: verticalScale(40),
-    },
-    headerContainer: {
-        gap: verticalScale(10),
-        alignItems: 'center',
-        marginBottom: verticalScale(20),
-    },
-    card: {
-        width: widthPx(85),
-        backgroundColor: Colors.cardBackground,
-        borderRadius: moderateScale(16),
-        paddingHorizontal: scale(24),
-        paddingVertical: verticalScale(24),
-    },
-    label: {
-        marginBottom: verticalScale(8),
-        letterSpacing: 1,
-        textTransform: 'uppercase',
-    },
-    inputContainer: {
-        gap: verticalScale(20),
-        marginBottom: verticalScale(20),
-    },
-    signUpText: {
-        ...CommonStylesFn.text(3.5, Colors.textMuted, Fonts.regular),
-        marginBottom: verticalScale(10),
-        textAlign: 'center',
-    },
-    button: {
-        marginBottom: verticalScale(20),
-    },
-    input: {
-        borderWidth: moderateScale(1),
-        borderColor: Colors.borderColor,
-        borderRadius: moderateScale(12),
-        paddingHorizontal: scale(16),
-        paddingVertical: verticalScale(16),
-        backgroundColor: Colors.surface,
-        ...CommonStylesFn.text(3.5, Colors.textPrimary, Fonts.regular),
-    },
-    errorText: {
-        ...CommonStylesFn.text(3.5, Colors.error, Fonts.regular),
-        marginBottom: verticalScale(20),
-        textAlign: 'center',
-    },
-});
+}
