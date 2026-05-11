@@ -1,5 +1,6 @@
-import { create } from 'zustand';
 import { User } from '@/api/User/types';
+import { create } from 'zustand';
+import { useEncryptionStore } from './EncryptionStore';
 
 interface UserStore {
     user: User | undefined;
@@ -20,5 +21,6 @@ export const useUserStore = create<UserStore>((set) => ({
 }));
 
 export const revertAll = async () => {
+    await useEncryptionStore.getState().clearRandomString();
     useUserStore.setState({ user: undefined, isAuthenticated: false });
 };
