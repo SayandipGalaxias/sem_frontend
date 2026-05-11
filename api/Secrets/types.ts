@@ -21,6 +21,6 @@ export interface DeleteSecretRequest {
 export interface UpdateSecretRequest {
     id: string;
     name?: string;
-    secret?: string;
+    secret: string;
     description?: string;
 }

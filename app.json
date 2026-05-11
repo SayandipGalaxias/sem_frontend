@@ -8,17 +8,12 @@
     "scheme": "secret-manager",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0f172a"
-    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
         "NSFaceIDUsageDescription": "We use Face ID to protect your secrets"
       },
-      "bundleIdentifier": "com.anonymous.secretmanager"
+      "bundleIdentifier": "com.galaxias.secretmanager"
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +28,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./assets/images/app_icon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -41,7 +36,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/app_icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -58,6 +53,12 @@
           "fonts": [
             "./assets/fonts/Inter.ttf"
           ]
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID."
         }
       ]
     ],
