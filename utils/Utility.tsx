@@ -110,9 +110,11 @@ const getRandomColor = () => {
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };
 
-const getRandomSecret = () => {
-  const randomString = `${useUserStore.getState().user?.email}${generateRandomString(10)}`;
-  const encryptedSecret = encryptSecret(randomString, randomString);
+const getRandomSecret = async (): Promise<string> => {
+  const email = useUserStore.getState().user?.email ?? '';
+  const randomString = generateRandomString(10);
+  const encryptionKey = generateEncryptionKey(email, randomString);
+  const encryptedSecret = await encryptSecret(randomString, encryptionKey);
   return encryptedSecret;
 };
 
@@ -120,7 +122,7 @@ const getAccessToken = () => {
   return useUserStore.getState().user;
 };
 
-const generateRandomString = (length: number): string => {
+export const generateRandomString = (length: number): string => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const charactersLength = characters.length;
   let result = '';

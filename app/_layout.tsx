@@ -1,3 +1,4 @@
+import { useEncryptionStore } from '@/store/EncryptionStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
@@ -17,6 +18,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
     const colorScheme = useColorScheme();
     const { setUser, setHydrated } = useUserStore();
+    const { loadRandomString } = useEncryptionStore();
 
     const [fontsLoaded] = useFonts({
         Inter: require('../assets/fonts/Inter.ttf'),
@@ -30,6 +32,7 @@ export default function RootLayout() {
                 if (token && userRaw) {
                     const user = JSON.parse(userRaw);
                     setUser(user);
+                    await loadRandomString();
                 }
             } catch (e) {
                 console.warn('Failed to hydrate auth', e);
