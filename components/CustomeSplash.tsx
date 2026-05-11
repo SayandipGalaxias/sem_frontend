@@ -1,38 +1,37 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Text, View } from 'react-native';
+import LottieView from 'lottie-react-native';
+import React, { useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
 
-type Props = {
+interface Props {
     onFinish: () => void;
-};
+}
 
 export default function CustomSplash({ onFinish }: Props) {
-    const opacity = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        Animated.sequence([
-            Animated.timing(opacity, {
-                toValue: 1,
-                duration: 800,
-                useNativeDriver: true,
-            }),
-            Animated.delay(1200),
-            Animated.timing(opacity, {
-                toValue: 0,
-                duration: 500,
-                useNativeDriver: true,
-            }),
-        ]).start(() => {
-            onFinish();
-        });
-    }, []);
+    const animation = useRef<LottieView>(null);
 
     return (
-        <View className="flex-1 items-center justify-center bg-black">
-            <Animated.View style={{ opacity }}>
-                <Text className="dark:text-white text-black text-4xl font-bold">
-                    iSmart
-                </Text>
-            </Animated.View>
+        <View style={styles.container}>
+            <LottieView
+                ref={animation}
+                source={require('../assets/animations/splash.json')}
+                autoPlay
+                loop={false}
+                onAnimationFinish={onFinish}
+                style={styles.lottie}
+            />
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#ffffff',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    lottie: {
+        width: 200,
+        height: 200,
+    },
+});

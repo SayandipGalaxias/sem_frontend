@@ -1,3 +1,6 @@
+import { useEncryptionStore } from '@/store/EncryptionStore';
+import { useUserStore } from '@/store/UserStore';
+import { Utility } from '@/utils/Utility';
 import { StatusResponse } from '../types';
 import axiosInstance from '../utils/axiosFetch';
 import type {
@@ -7,7 +10,11 @@ import type {
 
 export class SecretsApi {
     static async addSecret(payload: AddSecretRequest) {
-        return axiosInstance.post<StatusResponse<AddSecretResponse>>('secrets/addsecret', payload);
+        const { email } = useUserStore.getState().user!;
+        const { randomString } = useEncryptionStore.getState();
+        const encryptionKey = await Utility.generateEncryptionKey(email, randomString);
+        const encryptedSecret = await Utility.encryptSecret(payload.secret, encryptionKey);
+        return axiosInstance.post<StatusResponse<AddSecretResponse>>('secrets/addsecret', { ...payload, secret: encryptedSecret });
     }
 
     static async getList() {
@@ -20,6 +27,10 @@ export class SecretsApi {
 
     static async updateSecret(payload: UpdateSecretRequest) {
         const { id, ...body } = payload;
-        return axiosInstance.put<StatusResponse<void>>(`secrets/updatesecret/${id}`, body);
+        const { email } = useUserStore.getState().user!;
+        const { randomString } = useEncryptionStore.getState();
+        const encryptionKey = await Utility.generateEncryptionKey(email, randomString);
+        const encryptedSecret = await Utility.encryptSecret(payload.secret, encryptionKey);
+        return axiosInstance.put<StatusResponse<void>>(`secrets/updatesecret/${id}`, { ...body, secret: encryptedSecret });
     }
 }

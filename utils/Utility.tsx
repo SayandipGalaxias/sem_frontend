@@ -1,13 +1,16 @@
-import Toast, { BaseToast, BaseToastProps, ErrorToast } from 'react-native-toast-message';
-import { Colors } from './colors';
-import { scale, verticalScale, widthPx } from './Responsive';
-import { Fonts } from './Fonts';
-import { CommonStylesFn } from './CommonStyles';
+import { useEncryptionStore } from "@/store/EncryptionStore";
+import CryptoJS from 'crypto-js';
+import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
-import { Screens, ToastType } from './const';
+import 'react-native-get-random-values';
+import Toast, { BaseToast, BaseToastProps, ErrorToast } from 'react-native-toast-message';
 import { ErrorWithMessage } from '../interfaces/Network';
 import { revertAll, useUserStore } from '../store/UserStore';
-
+import { Colors } from './colors';
+import { CommonStylesFn } from './CommonStyles';
+import { ToastType } from './const';
+import { Fonts } from './Fonts';
+import { scale, verticalScale, widthPx } from './Responsive';
 
 export const toastConfig = {
   success: (props: BaseToastProps) => (
@@ -129,23 +132,35 @@ const generateRandomString = (length: number): string => {
   return result;
 };
 
-export const generateEncryptionKey = async (
+export const generateEncryptionKey = (
   email: string,
   randomString: string,
-): Promise<string> => {
-  const combined = `${email}${randomString}`;
-  // const hashedKey = await AES.sha256(combined);
-  const hashedKey = combined;
-  return hashedKey;
+): string => {
+  const salt = CryptoJS.enc.Utf8.parse(email);
+  const key = CryptoJS.PBKDF2(randomString, salt, {
+    keySize: 256 / 32,
+    iterations: 10000,
+    hasher: CryptoJS.algo.SHA256,
+  });
+  // console.log('Generated Encryption Key:', key.toString());
+  return key.toString();
 };
 
-export const encryptSecret = async (plainText: string, encryptionKey: string): Promise<string> => {
+export const encryptSecret = async (
+  plainText: string,
+  encryptionKey: string
+): Promise<string> => {
   try {
-    // const iv = await AES.randomKey(16); // Generate random 16 bytes IV
-    // const cipher = await AES.encrypt(plainText, encryptionKey, iv, 'aes-256-cbc');
-    const iv = 'randomIV';
-    const cipher = plainText;
-    return JSON.stringify({ cipher, iv }); // save IV + cipher together
+    const ivBytes = Crypto.getRandomValues(new Uint8Array(16));
+    const iv = CryptoJS.lib.WordArray.create(ivBytes as unknown as number[]);
+    const key = CryptoJS.enc.Hex.parse(encryptionKey);
+
+    const cipher = CryptoJS.AES.encrypt(plainText, key, { iv });
+
+    return JSON.stringify({
+      cipher: cipher.toString(),
+      iv: Array.from(ivBytes),
+    });
   } catch (error) {
     console.error('Encryption Error:', error);
     throw new Error('Failed to encrypt secret');
@@ -154,13 +169,24 @@ export const encryptSecret = async (plainText: string, encryptionKey: string): P
 
 export const decryptSecret = async (encryptedData: string): Promise<string> => {
   try {
-    // const { email } = useUserStore.getState().user;
-    // const { randomString } = useEncryptionStore.getState();
-    // const generatedEncryptionKey = await generateEncryptionKey(email, randomString);
+    const user = useUserStore.getState().user;
+    const email = user?.email.toString() || '';
+    const { randomString } = useEncryptionStore.getState();
 
-    const { cipher, iv } = JSON.parse(encryptedData);
-    // const plainText = await AES.decrypt(cipher, generatedEncryptionKey, iv, 'aes-256-cbc');
-    const plainText = cipher;
+    const generatedEncryptionKey = generateEncryptionKey(email, randomString);
+    const key = CryptoJS.enc.Hex.parse(generatedEncryptionKey);
+
+    const { cipher, iv: ivStored } = JSON.parse(encryptedData);
+    const iv = CryptoJS.lib.WordArray.create(new Uint8Array(ivStored) as unknown as number[]);
+
+    const decrypted = CryptoJS.AES.decrypt(cipher, key, { iv });
+
+    // console.log('Decrypted sigBytes:', decrypted.sigBytes);
+
+    const plainText = decrypted.toString(CryptoJS.enc.Utf8);
+    if (!plainText) throw new Error('Empty result — key mismatch or corrupted data');
+
+    // console.log('Decrypted data (text):', plainText);
     return plainText;
   } catch (error) {
     console.error('Decryption Error:', error);
