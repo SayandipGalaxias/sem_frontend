@@ -4,6 +4,7 @@ enum Screens {
     Login = 'Login',
     Signup = 'Signup',
     CreateSecret = 'CreateSecret',
+    ConnectServer = 'ConnectServer'
 }
 
 enum ToastType {

@@ -1,5 +1,3 @@
-import { LocalStorageItems } from '@/constants/config';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Platform } from 'react-native';
 
@@ -23,10 +21,10 @@ const axiosInstance = axios.create({
     baseURL: getBaseURL(),
 });
 
-axiosInstance.interceptors.request.use(async (config) => {
-    const token = await AsyncStorage.getItem(LocalStorageItems.TOKEN);
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-});
+// axiosInstance.interceptors.request.use(async (config) => {
+//     const token = await AsyncStorage.getItem(LocalStorageItems.TOKEN);
+//     if (token) config.headers.Authorization = `Bearer ${token}`;
+//     return config;
+// });
 
 export default axiosInstance;
