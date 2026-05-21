@@ -141,10 +141,9 @@ export const generateEncryptionKey = (
   const salt = CryptoJS.enc.Utf8.parse(email);
   const key = CryptoJS.PBKDF2(randomString, salt, {
     keySize: 256 / 32,
-    iterations: 10000,
+    iterations: 1000,
     hasher: CryptoJS.algo.SHA256,
   });
-  // console.log('Generated Encryption Key:', key.toString());
   return key.toString();
 };
 
@@ -191,8 +190,35 @@ export const decryptSecret = async (encryptedData: string): Promise<string> => {
     // console.log('Decrypted data (text):', plainText);
     return plainText;
   } catch (error) {
-    console.error('Decryption Error:', error);
-    throw new Error('Failed to decrypt secret');
+    // console.error('Decryption Error:', error);
+    // throw new Error('Failed to decrypt secret');
+    showToast(ToastType.error, 'Decryption Failed', 'May be this secret was encrypted on another device.');
+    return 'Decryption Failed';
+  }
+};
+
+export const decryptSecretWithKey = async (
+  encryptedData: string,
+  encryptionKey: string,
+): Promise<string> => {
+  try {
+    const key = CryptoJS.enc.Hex.parse(encryptionKey);
+    const parsed = JSON.parse(encryptedData);
+    console.log('decryptSecretWithKey — parsed:', parsed);
+    console.log('decryptSecretWithKey — key length:', encryptionKey.length);
+    const { cipher, iv: ivStored } = parsed;
+    const iv = CryptoJS.lib.WordArray.create(
+      new Uint8Array(ivStored) as unknown as number[],
+    );
+    const decrypted = CryptoJS.AES.decrypt(cipher, key, { iv });
+    const plainText = decrypted.toString(CryptoJS.enc.Utf8);
+    console.log('decryptSecretWithKey — plainText length:', plainText.length);
+    if (!plainText) throw new Error('Empty result — key mismatch or corrupted data');
+    return plainText;
+  } catch (error) {
+    console.error('decryptSecretWithKey REAL ERROR:', error);
+    showToast(ToastType.error, 'Decryption Failed', 'Secret may have been encrypted on another device.');
+    return 'Decryption Failed';
   }
 };
 
@@ -213,5 +239,6 @@ export const Utility = {
   generateEncryptionKey,
   encryptSecret,
   decryptSecret,
+  decryptSecretWithKey,
   isEmailValid,
 };

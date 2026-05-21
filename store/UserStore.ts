@@ -21,6 +21,9 @@ export const useUserStore = create<UserStore>((set) => ({
 }));
 
 export const revertAll = async () => {
-    await useEncryptionStore.getState().clearRandomString();
+    // await SecretsApi.clearAll();
+    const email = useUserStore.getState().user?.email ?? '';
+    // await useEncryptionStore.getState().clearRandomString(email);
+    useEncryptionStore.setState({ randomString: '' });
     useUserStore.setState({ user: undefined, isAuthenticated: false });
 };

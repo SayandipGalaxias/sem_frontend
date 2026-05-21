@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Secret Manager",
-    "slug": "secret-manager",
+    "name": "iSmart Manager",
+    "slug": "ismart-manager",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "secret-manager",
+    "scheme": "ismart-manager",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

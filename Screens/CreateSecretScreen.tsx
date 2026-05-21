@@ -330,10 +330,9 @@ function FormCard({
                             style={{
                                 flex: 1,
                                 fontSize: isTablet ? 15 : 14,
-                                color: '#000',
                                 paddingVertical: isTablet ? 16 : 14,
                             }}
-                            className="dark:text-white p-0 focus:outline-none"
+                            className="text-black dark:text-white p-0 focus:outline-none"
                         />
                     }
                 />
@@ -354,7 +353,6 @@ function FormCard({
                             style={{
                                 flex: 1,
                                 fontSize: isTablet ? 15 : 14,
-                                color: '#000',
                                 paddingVertical: isTablet ? 16 : 14,
                                 minHeight: isTablet ? 96 : 80,
                                 textAlignVertical: 'top',
@@ -380,7 +378,6 @@ function FormCard({
                             style={{
                                 flex: 1,
                                 fontSize: isTablet ? 15 : 14,
-                                color: '#000',
                                 paddingVertical: isTablet ? 16 : 14,
                                 minHeight: isTablet ? 96 : 80,
                                 textAlignVertical: 'top',

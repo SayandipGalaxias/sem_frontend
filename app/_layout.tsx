@@ -27,12 +27,11 @@ export default function RootLayout() {
     useEffect(() => {
         async function hydrateAuth() {
             try {
-                const token = await AsyncStorage.getItem(LocalStorageItems.TOKEN);
                 const userRaw = await AsyncStorage.getItem(LocalStorageItems.USER);
-                if (token && userRaw) {
+                if (userRaw) {
                     const user = JSON.parse(userRaw);
                     setUser(user);
-                    await loadRandomString();
+                    await loadRandomString(user.email);
                 }
             } catch (e) {
                 console.warn('Failed to hydrate auth', e);
@@ -62,6 +61,9 @@ export default function RootLayout() {
                     <Stack.Screen name="(dashboard)" />
                     <Stack.Screen name="(create)" />
                     <Stack.Screen name="(view)" />
+                    <Stack.Screen name="(connect)" />
+                    <Stack.Screen name="(contacts)" />
+                    <Stack.Screen name="(pricing)" />
                 </Stack>
                 <Toast config={Utility.toastConfig} />
             </SafeAreaView>

@@ -1,80 +1,50 @@
-// import { create } from 'zustand';
-
-
-// interface EncryptionStore {
-//     randomString: string;
-//     updateRandomString: (randomString: string) => void;
-//     getItem: (key: string) => string | null;
-//     setItem: (key: string, value: string) => void;
-//     removeItem: (key: string) => void;
-// }
-
-// export const useEncryptionStore = create<EncryptionStore>((set) => ({
-//     randomString: '',
-//     updateRandomString: (randomString) => set({ randomString }),
-//     getItem: (key: string) => {
-//         try {
-//             const value = localStorage.getItem(key);
-//             return value;
-//         } catch (e) {
-//             console.warn('Failed to get item from localStorage', e);
-//             return null;
-//         }
-//     },
-//     setItem: (key: string, value: string) => {
-//         try {
-//             localStorage.setItem(key, value);
-//         } catch (e) {
-//             console.warn('Failed to set item in localStorage', e);
-//         }
-//     },
-//     removeItem: (key: string) => {
-//         try {
-//             localStorage.removeItem(key);
-//         } catch (e) {
-//             console.warn('Failed to remove item from localStorage', e);
-//         }
-//     },
-// }));
-
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 
-const RANDOM_STRING_KEY = 'encryption_random_string';
+// Key is scoped per user email so each user gets their own unique random string.
+// We sanitize the email to strip characters that SecureStore disallows in keys.
+const makeKey = (email: string) =>
+    `encryption_random_string_${email.replace(/[^a-zA-Z0-9_]/g, '_')}`;
 
 interface EncryptionStore {
     randomString: string;
-    loadRandomString: () => Promise<void>;
-    saveRandomString: (randomString: string) => Promise<void>;
-    clearRandomString: () => Promise<void>;
+    loadRandomString: (email: string) => Promise<void>;
+    saveRandomString: (email: string, randomString: string) => Promise<void>;
+    clearRandomString: (email: string) => Promise<void>;
 }
 
 export const useEncryptionStore = create<EncryptionStore>((set) => ({
     randomString: '',
 
-    loadRandomString: async () => {
+    loadRandomString: async (email: string) => {
         try {
-            const stored = await SecureStore.getItemAsync(RANDOM_STRING_KEY);
+            const key = makeKey(email);
+            const stored = await SecureStore.getItemAsync(key);
             if (stored) {
                 set({ randomString: stored });
+            } else {
+                // No string yet for this user — caller must generate and save one.
+                set({ randomString: '' });
             }
         } catch (e) {
             console.warn('Failed to load randomString from SecureStore', e);
         }
     },
 
-    saveRandomString: async (randomString: string) => {
+    saveRandomString: async (email: string, randomString: string) => {
         try {
-            await SecureStore.setItemAsync(RANDOM_STRING_KEY, randomString);
+            const key = makeKey(email);
+            await SecureStore.setItemAsync(key, randomString);
             set({ randomString });
         } catch (e) {
             console.warn('Failed to save randomString to SecureStore', e);
         }
     },
 
-    clearRandomString: async () => {
+    clearRandomString: async (email: string) => {
         try {
-            await SecureStore.deleteItemAsync(RANDOM_STRING_KEY);
+            const key = makeKey(email);
+            await SecureStore.deleteItemAsync(key);
             set({ randomString: '' });
         } catch (e) {
             console.warn('Failed to clear randomString from SecureStore', e);

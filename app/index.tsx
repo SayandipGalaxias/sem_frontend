@@ -1,8 +1,8 @@
+import { useUserStore } from '@/store/UserStore';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Colors } from '../constants/theme';
-import { useUserStore } from '../store/UserStore';
 
 export default function Index() {
     const { isAuthenticated, hydrated } = useUserStore();
@@ -10,12 +10,13 @@ export default function Index() {
 
     useEffect(() => {
         if (!hydrated) return;
+
         if (isAuthenticated) {
-            router.replace('/(dashboard)' as any);
+            router.replace('/(dashboard)');
         } else {
             router.replace('/login');
         }
-    }, [hydrated]);
+    }, [hydrated, isAuthenticated]);
 
     return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.dark.background }}>

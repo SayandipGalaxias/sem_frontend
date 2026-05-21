@@ -67,7 +67,7 @@ export default function ViewSecretScreen() {
 
     useEffect(() => {
         if (params.secret) {
-            Utility.decryptSecret(params.secret).then((res) => {
+            Promise.resolve(params.secret).then((res) => {
                 setDecryptedSecret(res);
                 setSecret(res);
             });

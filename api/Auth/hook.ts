@@ -1,89 +1,17 @@
-// import AsyncStorage from '@react-native-async-storage/async-storage';
-// import { useRouter } from 'expo-router';
-// import { useState } from 'react';
-// import Toast from 'react-native-toast-message';
-// import { AuthApi } from '.';
+import { LocalStorageItems } from "@/constants/config";
+import { useEncryptionStore } from "@/store/EncryptionStore";
+import { useUserStore } from "@/store/UserStore";
+import { generateRandomString } from "@/utils/Utility";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Platform } from "react-native";
+import Toast from "react-native-toast-message";
+import { errorHandler } from "../utils/handlers";
+import { LoginRequest, RegisterRequest } from "./types";
 
-// import { LocalStorageItems } from '@/constants/config';
-// import { useUserStore } from '@/store/UserStore';
-// import { Platform } from 'react-native';
-// import { errorHandler } from '../utils/handlers';
-// import { LoginRequest, RegisterRequest } from './types';
-
-// export function useAuthApi() {
-//     const [loading, setLoading] = useState(false);
-//     const setUser = useUserStore((store) => store.setUser);
-//     const router = useRouter();
-
-//     async function login(payload: LoginRequest) {
-//         setLoading(true);
-//         try {
-//             const { data: { data: res } } = await AuthApi.login(payload);
-//             const user = { email: payload.email, type: 'user' };
-//             await AsyncStorage.setItem(LocalStorageItems.TOKEN, res.token);
-//             await AsyncStorage.setItem(LocalStorageItems.USER, JSON.stringify(user));
-//             setUser(user);
-//             if (Platform.OS === 'web') {
-//                 router.replace('/dashboard' as any);
-//             } else {
-//                 router.replace('/(dashboard)' as any);
-//             }
-//         } catch (error) {
-//             Toast.show({ type: 'error', text1: errorHandler(error) });
-//         } finally {
-//             setLoading(false);
-//         }
-//     }
-
-//     async function logout() {
-//         useUserStore.setState({ user: undefined, isAuthenticated: false });
-//         await AsyncStorage.clear();
-//         router.replace('/login');
-//     }
-
-//     async function register(email: string, password: string, payload: RegisterRequest) {
-//         setLoading(true);
-//         try {
-//             const response = await AuthApi.register(payload);
-
-//             if (!response.data?.success) {
-//                 Toast.show({ type: 'error', text1: 'Registration failed' });
-//                 return;
-//             }
-
-//             await login({ email: payload.email, password: payload.password });
-
-//         } catch (error: any) {
-//             const status = error?.response?.status;
-//             const serverMessage = error?.response?.data?.message ?? error?.response?.data?.error;
-
-//             const friendlyMessage =
-//                 status === 409 ? 'An account with this email already exists' :
-//                     status === 500 ? (serverMessage ?? 'Server error, please try again later') :
-//                         status === 400 ? (serverMessage ?? 'Invalid email or password') :
-//                             serverMessage ?? 'Something went wrong';
-
-//             Toast.show({ type: 'error', text1: friendlyMessage });
-//         } finally {
-//             setLoading(false);
-//         }
-//     }
-
-//     return { loading, login, register, logout };
-// }
-
-import { LocalStorageItems } from '@/constants/config';
-import { useEncryptionStore } from '@/store/EncryptionStore';
-import { useUserStore } from '@/store/UserStore';
-import { generateRandomString } from '@/utils/Utility';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Platform } from 'react-native';
-import Toast from 'react-native-toast-message';
-import { AuthApi } from '.';
-import { errorHandler } from '../utils/handlers';
-import { LoginRequest, RegisterRequest } from './types';
+const TEST_EMAIL = "testsayandip1@gmail.com";
+const TEST_PASSWORD = "testsayandip";
 
 export function useAuthApi() {
     const [loading, setLoading] = useState(false);
@@ -93,60 +21,66 @@ export function useAuthApi() {
     async function login(payload: LoginRequest) {
         setLoading(true);
         try {
-            const { data: { data: res } } = await AuthApi.login(payload);
-            const user = { email: payload.email, type: 'user' };
+            if (
+                payload.email.trim().toLowerCase() !== TEST_EMAIL ||
+                payload.password !== TEST_PASSWORD
+            ) {
+                Toast.show({ type: "error", text1: "Invalid email or password" });
+                return;
+            }
 
-            await AsyncStorage.setItem(LocalStorageItems.TOKEN, res.token);
-            await AsyncStorage.setItem(LocalStorageItems.USER, JSON.stringify(user));
+            const user = { email: TEST_EMAIL, type: "user" };
+
+            await AsyncStorage.setItem(
+                LocalStorageItems.USER,
+                JSON.stringify(user),
+            );
             setUser(user);
 
-            await useEncryptionStore.getState().loadRandomString();
-
+            await useEncryptionStore.getState().loadRandomString(user.email);
             if (!useEncryptionStore.getState().randomString) {
-                const newRandomString = generateRandomString(10);
-                await useEncryptionStore.getState().saveRandomString(newRandomString);
+                const newRandomString = generateRandomString(32);
+                await useEncryptionStore
+                    .getState()
+                    .saveRandomString(user.email, newRandomString);
             }
 
-            if (Platform.OS === 'web') {
-                router.replace('/dashboard' as any);
+            if (Platform.OS === "web") {
+                router.replace("/dashboard" as any);
             } else {
-                router.replace('/(dashboard)' as any);
+                router.replace("/(dashboard)" as any);
             }
         } catch (error) {
-            Toast.show({ type: 'error', text1: errorHandler(error) });
+            Toast.show({ type: "error", text1: errorHandler(error) });
         } finally {
             setLoading(false);
         }
     }
 
     async function logout() {
-        await useEncryptionStore.getState().clearRandomString();
+        const email = useUserStore.getState().user?.email;
+
+        // await useEncryptionStore.getState().clearRandomString(email ?? '');
+
+        useEncryptionStore.setState({ randomString: '' });
         useUserStore.setState({ user: undefined, isAuthenticated: false });
-        await AsyncStorage.clear();
-        router.replace('/login');
+
+        await AsyncStorage.removeItem(LocalStorageItems.USER);
+        // SecretsApi.clearAll()
+
+        router.replace("/login");
     }
 
-    async function register(email: string, password: string, payload: RegisterRequest) {
+    async function register(
+        email: string,
+        password: string,
+        payload: RegisterRequest,
+    ) {
         setLoading(true);
         try {
-            const response = await AuthApi.register(payload);
-            if (!response.data?.success) {
-                Toast.show({ type: 'error', text1: 'Registration failed' });
-                return;
-            }
-            const newRandomString = generateRandomString(10);
-            await useEncryptionStore.getState().saveRandomString(newRandomString);
-
-            await login({ email: payload.email, password: payload.password });
+            Toast.show({ type: "info", text1: "Registration not available yet" });
         } catch (error: any) {
-            const status = error?.response?.status;
-            const serverMessage = error?.response?.data?.message ?? error?.response?.data?.error;
-            const friendlyMessage =
-                status === 409 ? 'An account with this email already exists' :
-                    status === 500 ? (serverMessage ?? 'Server error, please try again later') :
-                        status === 400 ? (serverMessage ?? 'Invalid email or password') :
-                            serverMessage ?? 'Something went wrong';
-            Toast.show({ type: 'error', text1: friendlyMessage });
+            Toast.show({ type: "error", text1: errorHandler(error) });
         } finally {
             setLoading(false);
         }

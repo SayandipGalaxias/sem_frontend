@@ -38,7 +38,7 @@ export default function SignupScreen() {
             return;
         }
         setError('');
-        await register(email, password, { email, password });
+        // await register(email, password, { email, password });
     };
 
     return (
