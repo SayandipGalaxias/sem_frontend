@@ -11,7 +11,14 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSFaceIDUsageDescription": "We use Face ID to protect your secrets"
+        "NSFaceIDUsageDescription": "We use Face ID to protect your secrets",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.640048659794-rr1od3j61u1icl16b6bgbq7sgfesggmp"
+            ]
+          }
+        ]
       },
       "bundleIdentifier": "com.galaxias.secretmanager"
     },
@@ -24,7 +31,22 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.secretmanager"
+      "package": "com.anonymous.secretmanager",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "com.googleusercontent.apps.640048659794-kud1lk5f0epocra48uaf5sqfe12o4eav"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "output": "static",

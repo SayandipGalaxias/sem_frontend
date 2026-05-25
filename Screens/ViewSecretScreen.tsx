@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     KeyboardAvoidingView,
     Platform,
@@ -502,6 +502,7 @@ function FormCard({
                             autoCapitalize="none"
                             autoCorrect={false}
                             secureTextEntry={!secretVisible}
+                            multiline={secretVisible}
                             style={{
                                 flex: 1,
                                 fontSize: isTablet ? 15 : 14,

@@ -12,18 +12,18 @@ import {
 const TABLET_WIDTH = 768;
 const DESKTOP_WIDTH = 1100;
 
-function FeatureItem({ text }: { text: string }) {
+function FeatureItem({ text, price }: { text: string, price: string }) {
     return (
         <View className="flex-row items-start mt-3">
-            <View className="w-6 h-6 rounded-full bg-[#4a6fa5]/10 items-center justify-center mr-3 mt-0.5">
+            <View className={`w-6 h-6 rounded-full ${price !== 'Free' ? 'bg-gray-200/10' : 'bg-gray-600/10'} items-center justify-center mr-3 mt-0.5`}>
                 <Ionicons
                     name="checkmark"
                     size={14}
-                    color="#4a6fa5"
+                    color="#9ca3af"
                 />
             </View>
 
-            <Text className="flex-1 text-[13px] leading-5 text-[#5b6475] dark:text-gray-300">
+            <Text className={`flex-1 text-[13px] leading-5 ${price !== 'Free' ? 'text-gray-200' : 'text-gray-600'}`}>
                 {text}
             </Text>
         </View>
@@ -136,6 +136,7 @@ function PricingCard({
                         <FeatureItem
                             key={feature}
                             text={feature}
+                            price={price}
                         />
                     ))}
                 </View>

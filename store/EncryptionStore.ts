@@ -1,8 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 
-// Key is scoped per user email so each user gets their own unique random string.
-// We sanitize the email to strip characters that SecureStore disallows in keys.
 const makeKey = (email: string) =>
     `encryption_random_string_${email.replace(/[^a-zA-Z0-9_]/g, '_')}`;
 
@@ -23,7 +21,6 @@ export const useEncryptionStore = create<EncryptionStore>((set) => ({
             if (stored) {
                 set({ randomString: stored });
             } else {
-                // No string yet for this user — caller must generate and save one.
                 set({ randomString: '' });
             }
         } catch (e) {

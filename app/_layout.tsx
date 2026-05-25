@@ -64,6 +64,7 @@ export default function RootLayout() {
                     <Stack.Screen name="(connect)" />
                     <Stack.Screen name="(contacts)" />
                     <Stack.Screen name="(pricing)" />
+                    <Stack.Screen name="(backup)" />
                 </Stack>
                 <Toast config={Utility.toastConfig} />
             </SafeAreaView>

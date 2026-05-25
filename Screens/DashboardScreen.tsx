@@ -96,6 +96,7 @@ const Drawer = ({
     onWhatsAppBackup,
     onPricing,
     onConnectServer,
+    onBackup,
 }: {
     email?: string;
     visible: boolean;
@@ -105,6 +106,7 @@ const Drawer = ({
     onWhatsAppBackup: () => void;
     onPricing: () => void;
     onConnectServer: () => void;
+    onBackup: () => void;
 }) => {
     const translateX = useRef(new Animated.Value(-320)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -157,6 +159,13 @@ const Drawer = ({
             onPress: onWhatsAppBackup,
             color: '#25D366',
             bg: 'bg-[rgba(37,211,102,0.10)]',
+        },
+        {
+            icon: 'sync-outline' as const,
+            label: 'Backup',
+            onPress: onBackup,
+            color: '#27D3F5',
+            bg: 'bg-[rgba(39,211,245,0.10)]',
         },
     ];
 
@@ -577,6 +586,7 @@ export default function DashboardScreen() {
                             onPricing={() => router.push('/(pricing)' as any)}
                             onConnectServer={() => router.push('/(connect)' as any)}
                             onWhatsAppBackup={() => router.push('/(whatsapp-backup)' as any)}
+                            onBackup={() => router.push('/(backup)' as any)}
                         />
                     </>
                 )}

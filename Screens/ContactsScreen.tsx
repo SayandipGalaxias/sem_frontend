@@ -143,38 +143,6 @@ export default function ContactsScreen() {
 
     return (
         <View className="flex-1 bg-[#e8ecf4] dark:bg-black">
-            {/* <View
-                className={`flex-row items-center justify-between ${isTablet ? 'px-8 py-6' : 'px-5 py-4'
-                    }`}
-            >
-                <View>
-                    <Text className="text-black dark:text-white text-xl font-bold">
-                        Contacts Backup
-                    </Text>
-
-                    <Text className="text-[#8a93a6] mt-1">
-                        {contacts.length} contacts stored
-                    </Text>
-                </View>
-
-                {Platform.OS !== 'web' && (
-                    <TouchableOpacity
-                        onPress={backupContacts}
-                        activeOpacity={0.85}
-                        className="bg-[#4a6fa5] px-5 py-3 rounded-2xl flex-row items-center"
-                    >
-                        <Ionicons
-                            name="cloud-upload-outline"
-                            size={18}
-                            color="#fff"
-                        />
-
-                        <Text className="text-white font-semibold ml-2">
-                            Backup
-                        </Text>
-                    </TouchableOpacity>
-                )}
-            </View> */}
 
             <View
                 className={`flex-row items-center justify-between ${isTablet ? 'px-8 py-6' : 'px-5 py-4'

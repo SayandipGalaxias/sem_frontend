@@ -29,7 +29,7 @@ export class SecretsApi {
     private static async getEncryptionKey(): Promise<string> {
         const email = SecretsApi.getEmail();
         const { randomString } = useEncryptionStore.getState();
-        console.log('getEncryptionKey — email:', email, '| randomString length:', randomString.length);
+        // console.log('getEncryptionKey — email:', email, '| randomString length:', randomString.length);
 
         if (!randomString) throw new Error('Encryption random string not loaded yet');
 

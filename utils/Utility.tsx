@@ -1,6 +1,7 @@
 import { useEncryptionStore } from "@/store/EncryptionStore";
 import CryptoJS from 'crypto-js';
 import * as Crypto from 'expo-crypto';
+import React from "react";
 import { Platform } from 'react-native';
 import 'react-native-get-random-values';
 import Toast, { BaseToast, BaseToastProps, ErrorToast } from 'react-native-toast-message';
@@ -63,8 +64,7 @@ export const showToast = (type: ToastType, title: string, subTitle?: string) => 
     type,
     text1: title ?? 'Something went wrong',
     ...(subTitle && { text2: subTitle }),
-  });
-};
+  });};
 
 const isErrorWithMessage = (error: unknown): error is ErrorWithMessage => {
   return (
@@ -204,15 +204,15 @@ export const decryptSecretWithKey = async (
   try {
     const key = CryptoJS.enc.Hex.parse(encryptionKey);
     const parsed = JSON.parse(encryptedData);
-    console.log('decryptSecretWithKey — parsed:', parsed);
-    console.log('decryptSecretWithKey — key length:', encryptionKey.length);
+    // console.log('decryptSecretWithKey — parsed:', parsed);
+    // console.log('decryptSecretWithKey — key length:', encryptionKey.length);
     const { cipher, iv: ivStored } = parsed;
     const iv = CryptoJS.lib.WordArray.create(
       new Uint8Array(ivStored) as unknown as number[],
     );
     const decrypted = CryptoJS.AES.decrypt(cipher, key, { iv });
     const plainText = decrypted.toString(CryptoJS.enc.Utf8);
-    console.log('decryptSecretWithKey — plainText length:', plainText.length);
+    // console.log('decryptSecretWithKey — plainText length:', plainText.length);
     if (!plainText) throw new Error('Empty result — key mismatch or corrupted data');
     return plainText;
   } catch (error) {

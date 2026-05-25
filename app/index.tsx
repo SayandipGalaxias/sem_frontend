@@ -1,6 +1,6 @@
 import { useUserStore } from '@/store/UserStore';
 import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Colors } from '../constants/theme';
 

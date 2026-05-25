@@ -1,49 +1,55 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { AppContact } from '../interfaces/Contacts';
 
-interface ContactsState {
+import type { AppContact } from '../interfaces/Contacts';
+import { useUserStore } from './UserStore';
+
+function contactsKey(email: string) {
+    return `@contacts_${email}`;
+}
+
+interface ContactsStore {
     contacts: AppContact[];
     loading: boolean;
-
     setContacts: (contacts: AppContact[]) => Promise<void>;
     loadContacts: () => Promise<void>;
     clearContacts: () => Promise<void>;
 }
 
-const STORAGE_KEY = 'CONTACTS_BACKUP';
-
-export const useContactsStore = create<ContactsState>((set) => ({
+export const useContactsStore = create<ContactsStore>((set, get) => ({
     contacts: [],
     loading: false,
 
-    setContacts: async (contacts) => {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(contacts));
-
+    setContacts: async (contacts: AppContact[]) => {
+        const email = useUserStore.getState().user?.email ?? '';
+        if (email) {
+            await AsyncStorage.setItem(contactsKey(email), JSON.stringify(contacts));
+        }
         set({ contacts });
     },
 
     loadContacts: async () => {
+        set({ loading: true });
         try {
-            set({ loading: true });
-
-            const raw = await AsyncStorage.getItem(STORAGE_KEY);
-
-            if (raw) {
-                set({
-                    contacts: JSON.parse(raw),
-                });
+            const email = useUserStore.getState().user?.email ?? '';
+            if (email) {
+                const json = await AsyncStorage.getItem(contactsKey(email));
+                if (json) {
+                    set({ contacts: JSON.parse(json), loading: false });
+                    return;
+                }
             }
-        } finally {
+            set({ contacts: [], loading: false });
+        } catch (_) {
             set({ loading: false });
         }
     },
 
     clearContacts: async () => {
-        await AsyncStorage.removeItem(STORAGE_KEY);
-
-        set({
-            contacts: [],
-        });
+        const email = useUserStore.getState().user?.email ?? '';
+        if (email) {
+            await AsyncStorage.removeItem(contactsKey(email));
+        }
+        set({ contacts: [] });
     },
 }));
