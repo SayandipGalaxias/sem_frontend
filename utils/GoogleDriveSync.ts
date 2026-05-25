@@ -236,16 +236,39 @@ export async function signInWithGoogle(): Promise<DriveUser> {
     //     ].join('&'),
     // });
 
+    const tokenBody = [
+        `code=${encodeURIComponent(params.code)}`,
+        `client_id=${encodeURIComponent(clientId)}`,
+        `redirect_uri=${encodeURIComponent(redirectUri)}`,
+        `grant_type=authorization_code`,
+    ];
+
+    if (!isIos) {
+        tokenBody.push(`client_secret=${encodeURIComponent(WEB_CLIENT_SECRET)}`);
+    }
+
+
+    // const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    //     body: [
+    //         `code=${encodeURIComponent(params.code)}`,
+    //         `client_id=${encodeURIComponent(clientId)}`,
+    //         `client_secret=${encodeURIComponent(WEB_CLIENT_SECRET)}`,
+    //         `redirect_uri=${encodeURIComponent(redirectUri)}`,
+    //         `grant_type=authorization_code`,
+    //     ].join('&'),
+    // });
+
+    // const tokenJson = await tokenRes.json();
+    // if (!tokenJson.access_token) {
+    //     throw new Error(`Token exchange failed: ${JSON.stringify(tokenJson)}`);
+    // }
+
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: [
-            `code=${encodeURIComponent(params.code)}`,
-            `client_id=${encodeURIComponent(clientId)}`,
-            `client_secret=${encodeURIComponent(WEB_CLIENT_SECRET)}`,
-            `redirect_uri=${encodeURIComponent(redirectUri)}`,
-            `grant_type=authorization_code`,
-        ].join('&'),
+        body: tokenBody.join('&'),
     });
 
     const tokenJson = await tokenRes.json();

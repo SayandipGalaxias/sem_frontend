@@ -150,8 +150,8 @@ const Drawer = ({
             icon: 'server-outline' as const,
             label: 'Connect Server',
             onPress: onConnectServer,
-            color: '#10b981',
-            bg: 'bg-emerald-500/10',
+            color: '#e67e22',
+            bg: 'bg-orange-500/10',
         },
         {
             icon: 'logo-whatsapp' as const,
@@ -164,7 +164,7 @@ const Drawer = ({
             icon: 'sync-outline' as const,
             label: 'Backup',
             onPress: onBackup,
-            color: '#27D3F5',
+            color: '#16a085',
             bg: 'bg-[rgba(39,211,245,0.10)]',
         },
     ];
