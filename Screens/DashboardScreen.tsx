@@ -40,25 +40,13 @@ const SecretItem = ({
         activeOpacity={0.85}
         onPress={() => onView(item)}
         className={`flex-row bg-[#dce1ec] dark:bg-zinc-900 ${isTablet ? 'rounded-[20px] px-5 py-4 mb-0' : 'rounded-[18px] px-4 py-3.5 mb-2.5'}`}
-        style={isTablet ? {
-            shadowColor: '#000',
-            shadowOpacity: 0.05,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 2,
-        } : undefined}
     >
-        <View
-            className={`items-center justify-center bg-[rgba(74,111,165,0.12)] ${isTablet ? 'w-11 h-11 rounded-[14px] mr-3.5' : 'w-10 h-10 rounded-xl mr-3'}`}
-        >
+        <View className={`items-center justify-center bg-[rgba(74,111,165,0.12)] ${isTablet ? 'w-11 h-11 rounded-[14px] mr-3.5' : 'w-10 h-10 rounded-xl mr-3'}`}>
             <Ionicons name="key-outline" size={isTablet ? 20 : 18} color="#4a6fa5" />
         </View>
 
         <View className="flex-1">
-            <Text
-                className={`font-medium text-black dark:text-white ${isTablet ? 'text-[15px]' : 'text-[15px]'}`}
-                numberOfLines={1}
-            >
+            <Text className={`font-medium text-black dark:text-white ${isTablet ? 'text-[15px]' : 'text-[15px]'}`} numberOfLines={1}>
                 {item.name}
             </Text>
             <Text className="text-xs mt-0.5 text-gray-500 dark:text-gray-400" numberOfLines={1}>
@@ -299,16 +287,62 @@ function Sidebar({
     secretCount,
     onLogout,
     onCreateNew,
+    onContacts,
+    onWhatsAppBackup,
+    onPricing,
+    onConnectServer,
+    onBackup,
 }: {
     email?: string;
     secretCount: number;
     onLogout: () => void;
     onCreateNew: () => void;
+    onContacts: () => void;
+    onWhatsAppBackup: () => void;
+    onPricing: () => void;
+    onConnectServer: () => void;
+    onBackup: () => void;
 }) {
+    const menuItems = [
+        {
+            icon: 'people-outline' as const,
+            label: 'Contacts',
+            onPress: onContacts,
+            color: '#4a6fa5',
+            bg: 'rgba(74,111,165,0.10)',
+        },
+        {
+            icon: 'diamond-outline' as const,
+            label: 'Pricing',
+            onPress: onPricing,
+            color: '#f59e0b',
+            bg: 'rgba(245,158,11,0.10)',
+        },
+        {
+            icon: 'server-outline' as const,
+            label: 'Connect Server',
+            onPress: onConnectServer,
+            color: '#e67e22',
+            bg: 'rgba(230,126,34,0.10)',
+        },
+        {
+            icon: 'logo-whatsapp' as const,
+            label: 'WhatsApp Backup',
+            onPress: onWhatsAppBackup,
+            color: '#25D366',
+            bg: 'rgba(37,211,102,0.10)',
+        },
+        {
+            icon: 'sync-outline' as const,
+            label: 'Backup',
+            onPress: onBackup,
+            color: '#16a085',
+            bg: 'rgba(39,211,245,0.10)',
+        },
+    ];
+
     return (
-        <View
-            className="w-[260px] bg-[#dce1ec] dark:bg-zinc-900 border-r border-[rgba(74,111,165,0.08)] py-8 px-5 gap-7"
-        >
+        <View className="w-[260px] bg-[#dce1ec] dark:bg-zinc-900 border-r border-[rgba(74,111,165,0.08)] py-8 px-5 gap-5">
             <View className="gap-1.5">
                 <View
                     className="w-[52px] h-[52px] rounded-[18px] bg-[#4a6fa5] items-center justify-center mb-1"
@@ -356,14 +390,37 @@ function Sidebar({
                 <Text className="text-sm font-semibold text-white">New Secret</Text>
             </TouchableOpacity>
 
-            <View className="flex-1" />
+
+            <View className="gap-0.5">
+                {menuItems.map((item) => (
+                    <TouchableOpacity
+                        key={item.label}
+                        onPress={item.onPress}
+                        activeOpacity={0.75}
+                        className="flex-row items-center px-3 py-[11px] rounded-[14px] gap-3"
+                    >
+                        <View
+                            className="w-9 h-9 rounded-[11px] items-center justify-center"
+                            style={{ backgroundColor: item.bg }}
+                        >
+                            <Ionicons name={item.icon} size={18} color={item.color} />
+                        </View>
+                        <Text className="flex-1 text-sm font-medium text-[#1a1a2e] dark:text-white">
+                            {item.label}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={14} color="#8a93a6" />
+                    </TouchableOpacity>
+                ))}
+            </View>
 
             <TouchableOpacity
                 onPress={onLogout}
                 activeOpacity={0.75}
                 className="flex-row items-center gap-2.5 px-3.5 py-3 rounded-[14px] bg-red-500/[0.08] border border-red-500/[0.12]"
             >
-                <Ionicons name="power" size={16} color={Colors.error} />
+                <View className="w-9 h-9 rounded-[11px] bg-red-500/10 items-center justify-center">
+                    <Ionicons name="power" size={16} color={Colors.error} />
+                </View>
                 <Text className="text-sm font-medium text-red-600">Logout</Text>
             </TouchableOpacity>
         </View>
@@ -485,11 +542,11 @@ export default function DashboardScreen() {
                 </View>
             ) : (
                 isTablet ? (
-                    <View className="flex-row flex-wrap gap-3">
+                    <View className="gap-3 grid grid-cols-3">
                         {displayedSecrets.map((item) => (
                             <View
                                 key={item.id}
-                                style={{ width: isDesktop ? 'calc(50% - 6px)' as any : '100%' }}
+                                style={{ width: '100%' }}
                             >
                                 <SecretItem
                                     item={item}
@@ -522,14 +579,19 @@ export default function DashboardScreen() {
             <View className="flex-1 bg-[#e8ecf4] dark:bg-black w-full">
 
                 {isDesktop ? (
-                    <View className="flex-1 flex-row">
+                    <View className="flex-1 flex-row" style={{ height: '100%' }}>
                         <Sidebar
                             email={user?.email}
                             secretCount={displayedSecrets.length}
                             onLogout={() => setShowLogoutModal(true)}
                             onCreateNew={handleCreateNew}
+                            onContacts={() => router.push('/(contacts)' as any)}
+                            onWhatsAppBackup={() => router.push('/(whatsapp-backup)' as any)}
+                            onPricing={() => router.push('/(pricing)' as any)}
+                            onConnectServer={() => router.push('/(connect)' as any)}
+                            onBackup={() => router.push('/(backup)' as any)}
                         />
-                        <View className="flex-1">
+                        <View style={{ flex: 1, overflow: 'hidden' }}>
                             <ContentArea />
                         </View>
                     </View>

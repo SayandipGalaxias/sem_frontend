@@ -9,23 +9,22 @@ import { Platform } from 'react-native';
 import type { Secret } from '../api/Secrets/types';
 import type { AppContact } from '../interfaces/Contacts';
 
-
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_WEB_CLIENT_ID;
-
 const ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_ANDROID_CLIENT_ID;
-
 const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_IOS_CLIENT_ID;
-
 
 WebBrowser.maybeCompleteAuthSession();
 
-const SCOPES = ['https://www.googleapis.com/auth/drive.appdata'];
+const SCOPES = [
+    'https://www.googleapis.com/auth/drive.appdata',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email',
+];
 const BACKUP_FILE_NAME = 'ismart_backup.json';
 const MANIFEST_FILE_NAME = 'ismart_manifest.json';
 const BACKUP_SALT = 'ismart-backup-salt-v1';
 const ASYNC_KEY_DRIVE_USER = '@ismart/drive_user';
 const ASYNC_KEY_ACCESS_TOKEN = '@ismart/drive_access_token';
-
 
 export interface DriveUser {
     email: string;
@@ -50,9 +49,39 @@ export interface BackupInfo {
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
-
 let _accessToken: string | null = null;
 let _driveUser: DriveUser | null = null;
+
+function getSubtle(): SubtleCrypto | null {
+    console.log('globalThis.crypto', !!globalThis?.crypto);
+    console.log('globalThis.crypto.subtle', !!globalThis?.crypto?.subtle);
+
+    console.log('window.crypto', typeof window !== 'undefined' ? !!window.crypto : 'no window');
+    console.log(
+        'window.crypto.subtle',
+        typeof window !== 'undefined'
+            ? !!window.crypto?.subtle
+            : 'no window'
+    );
+
+    return globalThis?.crypto?.subtle ??
+        window?.crypto?.subtle ??
+        null;
+}
+
+function isWeb(): boolean {
+    try {
+        return (
+            typeof window !== 'undefined' &&
+            typeof window.location !== 'undefined' &&
+            typeof window.location.protocol === 'string' &&
+            window.location.protocol.startsWith('http') &&
+            getSubtle() !== null
+        );
+    } catch {
+        return false;
+    }
+}
 
 
 function authHeader() {
@@ -78,7 +107,10 @@ async function driveDownload(fileId: string): Promise<string> {
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         { headers: authHeader() },
     );
-    if (!res.ok) throw new Error(`Drive download failed: ${res.status}`);
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Drive download failed: ${res.status} — ${errText.slice(0, 100)}`);
+    }
     return res.text();
 }
 
@@ -138,62 +170,124 @@ async function driveUpsert(name: string, content: string): Promise<string> {
 }
 
 
-async function deriveBackupKey(email: string): Promise<Uint8Array> {
+async function sha256Native(data: Uint8Array): Promise<Uint8Array> {
+    const hex = Array.from(data)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+    const hashHex = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        hex,
+        { encoding: Crypto.CryptoEncoding.HEX }
+    );
+    return new Uint8Array((hashHex.match(/.{1,2}/g) as string[]).map(b => parseInt(b, 16)));
+}
+
+async function deriveBackupKeyNative(email: string): Promise<Uint8Array> {
     let key = new TextEncoder().encode(email + BACKUP_SALT);
     for (let i = 0; i < 1000; i++) {
-        const hashHex = await Crypto.digestStringAsync(
-            Crypto.CryptoDigestAlgorithm.SHA256,
-            Array.from(key).map(b => String.fromCharCode(b)).join(''),
-            { encoding: Crypto.CryptoEncoding.HEX },
-        );
-        key = new Uint8Array((hashHex.match(/.{1,2}/g) as string[]).map(b => parseInt(b, 16)));
+        key = await sha256Native(key);
     }
     return key;
 }
 
-async function encryptRandomString(randomString: string, email: string): Promise<string> {
-    const key = await deriveBackupKey(email);
+async function encryptPayloadNative(plaintext: string, email: string): Promise<string> {
+    const key = await deriveBackupKeyNative(email);
     const iv = await Crypto.getRandomBytesAsync(16);
-
-    const textBytes = aesjs.utils.utf8.toBytes(randomString);
+    const keyArr = Array.from(key);
+    const ivArr = Array.from(iv);
+    const textBytes = aesjs.utils.utf8.toBytes(plaintext);
     const pad = 16 - (textBytes.length % 16);
     const padded = new Uint8Array(textBytes.length + pad);
     padded.set(textBytes);
     padded.fill(pad, textBytes.length);
-
-    const aesCbc = new aesjs.ModeOfOperation.cbc(key, iv);
-    const encrypted = aesCbc.encrypt(padded);
-
-    const cipherHex = aesjs.utils.hex.fromBytes(encrypted);
-    const ivHex = aesjs.utils.hex.fromBytes(iv);
-    return JSON.stringify({ cipher: cipherHex, iv: ivHex });
+    const aesCbc = new aesjs.ModeOfOperation.cbc(keyArr, ivArr);
+    const encrypted = aesCbc.encrypt(Array.from(padded));
+    return JSON.stringify({
+        cipher: aesjs.utils.hex.fromBytes(encrypted),
+        iv: aesjs.utils.hex.fromBytes(ivArr),
+        web: false,
+    });
 }
 
-async function decryptRandomString(encrypted: string, email: string): Promise<string> {
-    const key = await deriveBackupKey(email);
-    const { cipher, iv } = JSON.parse(encrypted);
-
-    const cipherBytes = aesjs.utils.hex.toBytes(cipher);
-    const ivBytes = aesjs.utils.hex.toBytes(iv);
-
-    const aesCbc = new aesjs.ModeOfOperation.cbc(key, ivBytes);
-    const decrypted = aesCbc.decrypt(cipherBytes);
-
+async function decryptPayloadNative(encryptedJson: string, email: string): Promise<string> {
+    const trimmed = encryptedJson.trim();
+    if (!trimmed.startsWith('{')) {
+        throw new Error(`Expected JSON but got: "${trimmed.slice(0, 80)}"`);
+    }
+    const key = await deriveBackupKeyNative(email);
+    const keyArr = Array.from(key);
+    const parsed: { cipher: string; iv: string; web?: boolean } = JSON.parse(trimmed);
+    const ivArr = Array.from(aesjs.utils.hex.toBytes(parsed.iv));
+    const cipherArr = Array.from(aesjs.utils.hex.toBytes(parsed.cipher));
+    const aesCbc = new aesjs.ModeOfOperation.cbc(keyArr, ivArr);
+    const decrypted = aesCbc.decrypt(cipherArr);
     const padLen = decrypted[decrypted.length - 1];
-    const unpadded = decrypted.slice(0, decrypted.length - padLen);
-
-    const result = aesjs.utils.utf8.fromBytes(unpadded);
-    if (!result) throw new Error('randomString decryption failed — wrong email?');
-    return result;
+    return aesjs.utils.utf8.fromBytes(decrypted.slice(0, decrypted.length - padLen));
 }
+
+async function deriveBackupKeyWeb(email: string): Promise<CryptoKey> {
+    const subtle = getSubtle();
+    if (!subtle) throw new Error('SubtleCrypto not available');
+    const raw = new TextEncoder().encode(email + BACKUP_SALT);
+    const keyMaterial = await subtle.importKey(
+        'raw', raw, { name: 'PBKDF2' }, false, ['deriveKey'],
+    );
+    return subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: new TextEncoder().encode(email),
+            iterations: 1000,
+            hash: 'SHA-256',
+        },
+        keyMaterial,
+        { name: 'AES-CBC', length: 256 },
+        false,
+        ['encrypt', 'decrypt'],
+    );
+}
+
+
+async function encryptPayload(
+    plaintext: string,
+    email: string,
+): Promise<string> {
+    return encryptPayloadNative(plaintext, email);
+}
+
+async function decryptPayload(
+    encryptedJson: string,
+    email: string,
+): Promise<string> {
+    return decryptPayloadNative(encryptedJson, email);
+}
+
 
 const IOS_REDIRECT_URI = process.env.EXPO_PUBLIC_IOS_REDIRECT_URI;
-
 const ANDROID_REDIRECT_URI = process.env.EXPO_PUBLIC_ANDROID_REDIRECT_URI;
-
 const WEB_CLIENT_SECRET = process.env.EXPO_PUBLIC_WEB_CLIENT_SECRET;
 
 export async function signInWithGoogle(): Promise<DriveUser> {
+    if (isWeb()) {
+        const state = Math.random().toString(36).substring(2);
+        sessionStorage.setItem('oauth_state', state);
+
+        const redirectUri = window.location.origin + '/oauth-callback';
+        sessionStorage.setItem('oauth_redirect_uri', redirectUri);
+
+        const authUrl =
+            `https://accounts.google.com/o/oauth2/v2/auth` +
+            `?client_id=${encodeURIComponent(WEB_CLIENT_ID!)}` +
+            `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+            `&response_type=code` +
+            `&scope=${encodeURIComponent(SCOPES.join(' '))}` +
+            `&state=${state}` +
+            `&access_type=online`;
+
+        window.location.href = authUrl;
+        return new Promise(() => { });
+    }
+
     const isIos = Platform.OS === 'ios';
     const clientId = isIos ? IOS_CLIENT_ID : WEB_CLIENT_ID;
     const redirectUri = isIos ? IOS_REDIRECT_URI : ANDROID_REDIRECT_URI;
@@ -202,8 +296,8 @@ export async function signInWithGoogle(): Promise<DriveUser> {
 
     const authUrl =
         `https://accounts.google.com/o/oauth2/v2/auth` +
-        `?client_id=${encodeURIComponent(clientId)}` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `?client_id=${encodeURIComponent(clientId!)}` +
+        `&redirect_uri=${encodeURIComponent(redirectUri!)}` +
         `&response_type=code` +
         `&scope=${encodeURIComponent(SCOPES.join(' '))}` +
         `&state=${state}` +
@@ -213,57 +307,28 @@ export async function signInWithGoogle(): Promise<DriveUser> {
 
     if (result.type !== 'success') {
         throw new Error(
-            result.type === 'cancel' ? 'Sign-in cancelled' : `Sign-in failed: ${result.type}`
+            result.type === 'cancel' ? 'Sign-in cancelled' : `Sign-in failed: ${result.type}`,
         );
     }
 
     const returnUrl = result.url;
     const queryString = returnUrl.includes('?') ? returnUrl.split('?')[1] : '';
     const params = Object.fromEntries(
-        queryString.split('&').map(p => p.split('=').map(decodeURIComponent))
+        queryString.split('&').map(p => p.split('=').map(decodeURIComponent)),
     );
 
     if (!params.code) throw new Error('No authorization code returned');
 
-    // const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    //     body: [
-    //         `code=${encodeURIComponent(params.code)}`,
-    //         `client_id=${encodeURIComponent(clientId)}`,
-    //         `redirect_uri=${encodeURIComponent(redirectUri)}`,
-    //         `grant_type=authorization_code`,
-    //     ].join('&'),
-    // });
-
     const tokenBody = [
         `code=${encodeURIComponent(params.code)}`,
-        `client_id=${encodeURIComponent(clientId)}`,
-        `redirect_uri=${encodeURIComponent(redirectUri)}`,
+        `client_id=${encodeURIComponent(clientId!)}`,
+        `redirect_uri=${encodeURIComponent(redirectUri!)}`,
         `grant_type=authorization_code`,
     ];
 
     if (!isIos) {
-        tokenBody.push(`client_secret=${encodeURIComponent(WEB_CLIENT_SECRET)}`);
+        tokenBody.push(`client_secret=${encodeURIComponent(WEB_CLIENT_SECRET!)}`);
     }
-
-
-    // const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    //     body: [
-    //         `code=${encodeURIComponent(params.code)}`,
-    //         `client_id=${encodeURIComponent(clientId)}`,
-    //         `client_secret=${encodeURIComponent(WEB_CLIENT_SECRET)}`,
-    //         `redirect_uri=${encodeURIComponent(redirectUri)}`,
-    //         `grant_type=authorization_code`,
-    //     ].join('&'),
-    // });
-
-    // const tokenJson = await tokenRes.json();
-    // if (!tokenJson.access_token) {
-    //     throw new Error(`Token exchange failed: ${JSON.stringify(tokenJson)}`);
-    // }
 
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -282,7 +347,10 @@ export async function signInWithGoogle(): Promise<DriveUser> {
         headers: { Authorization: `Bearer ${_accessToken}` },
     });
     const profile = await profileRes.json();
-    _driveUser = { email: profile.email ?? 'unknown', name: profile.name };
+    _driveUser = {
+        email: profile.email ?? 'unknown',
+        name: profile.name ?? profile.given_name ?? undefined,
+    };
 
     await AsyncStorage.setItem(ASYNC_KEY_ACCESS_TOKEN, _accessToken!);
     await AsyncStorage.setItem(ASYNC_KEY_DRIVE_USER, JSON.stringify(_driveUser));
@@ -375,6 +443,8 @@ export async function backupToDrive(
 export async function restoreFromDrive(
     onProgress?: (msg: string) => void,
 ): Promise<void> {
+    
+    console.log('RESTORE START');
     if (!isDriveAuthenticated()) throw new Error('Not signed in to Google Drive.');
 
     const email = useUserStore.getState().user?.email;
@@ -391,8 +461,8 @@ export async function restoreFromDrive(
     let plaintext: string;
     try {
         plaintext = await decryptPayload(raw, email);
-    } catch (_) {
-        throw new Error('Failed to decrypt backup — make sure you are signed in with the same Google account used during backup.');
+    } catch (e) {
+        throw new Error(`Decrypt failed: ${e}`);
     }
 
     const payload = JSON.parse(plaintext) as {
@@ -403,12 +473,24 @@ export async function restoreFromDrive(
         randomString: string;
     };
 
+    console.log('RESTORE PAYLOAD');
+    console.log('secrets:', payload.secrets?.length);
+    console.log('contacts:', payload.contacts?.length);
+    console.log('randomString:', !!payload.randomString);
+
     onProgress?.('Restoring encryption key…');
     await useEncryptionStore.getState().saveRandomString(email, payload.randomString);
 
     onProgress?.('Restoring secrets…');
     const secretsKey = `secrets_${email.replace(/[^a-zA-Z0-9_]/g, '_')}`;
     await AsyncStorage.setItem(secretsKey, JSON.stringify(payload.secrets));
+
+    const verifySecrets = await AsyncStorage.getItem(secretsKey);
+
+    console.log(
+        'saved secrets',
+        JSON.parse(verifySecrets || '[]').length
+    );
 
     onProgress?.('Restoring contacts…');
     if (payload.contacts?.length) {
@@ -417,6 +499,7 @@ export async function restoreFromDrive(
     }
 
     onProgress?.('Restore complete ✓');
+    console.log('RESTORE COMPLETE');
 }
 
 export async function getBackupInfo(): Promise<BackupInfo | null> {
@@ -431,34 +514,9 @@ export async function getBackupInfo(): Promise<BackupInfo | null> {
     }
 }
 
-async function encryptPayload(plaintext: string, email: string): Promise<string> {
-    const key = await deriveBackupKey(email);
-    const iv = await Crypto.getRandomBytesAsync(16);
-
-    const textBytes = aesjs.utils.utf8.toBytes(plaintext);
-    const pad = 16 - (textBytes.length % 16);
-    const padded = new Uint8Array(textBytes.length + pad);
-    padded.set(textBytes);
-    padded.fill(pad, textBytes.length);
-
-    const aesCbc = new aesjs.ModeOfOperation.cbc(key, iv);
-    const encrypted = aesCbc.encrypt(padded);
-
-    return JSON.stringify({
-        cipher: aesjs.utils.hex.fromBytes(encrypted),
-        iv: aesjs.utils.hex.fromBytes(iv),
-    });
-}
-
-async function decryptPayload(encryptedJson: string, email: string): Promise<string> {
-    const key = await deriveBackupKey(email);
-    const { cipher, iv } = JSON.parse(encryptedJson);
-
-    const aesCbc = new aesjs.ModeOfOperation.cbc(
-        key,
-        aesjs.utils.hex.toBytes(iv),
-    );
-    const decrypted = aesCbc.decrypt(aesjs.utils.hex.toBytes(cipher));
-    const padLen = decrypted[decrypted.length - 1];
-    return aesjs.utils.utf8.fromBytes(decrypted.slice(0, decrypted.length - padLen));
+export async function deleteAllBackupFiles(): Promise<void> {
+    const files = await driveList(BACKUP_FILE_NAME);
+    for (const f of files) await driveDelete(f.id);
+    const manifests = await driveList(MANIFEST_FILE_NAME);
+    for (const f of manifests) await driveDelete(f.id);
 }

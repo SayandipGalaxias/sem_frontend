@@ -192,7 +192,7 @@ export default function ContactsScreen() {
                         />
 
                         <Text className="text-white font-semibold ml-2">
-                            Backup
+                            Contacts
                         </Text>
                     </TouchableOpacity>
                 )}
@@ -228,7 +228,7 @@ export default function ContactsScreen() {
                         padding: isTablet ? 24 : 16,
                         gap: 12,
                     }}
-                    numColumns={isDesktop ? 2 : 1}
+                    numColumns={isDesktop ? 4 : 1}
                     columnWrapperStyle={
                         isDesktop
                             ? {

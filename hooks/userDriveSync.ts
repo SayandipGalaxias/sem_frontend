@@ -91,7 +91,6 @@ export function useDriveSync() {
         setSyncMessage('');
     }, [stopAutoBackup]);
 
-
     const backup = useCallback(async () => {
         if (!isDriveAuthenticated()) {
             setSyncStatus('error');
@@ -110,18 +109,49 @@ export function useDriveSync() {
     }, [refreshBackupInfo]);
 
 
+    // const restore = useCallback(async () => {
+    //     if (!isDriveAuthenticated()) {
+    //         setSyncStatus('error');
+    //         setSyncMessage('Please sign in to Google first.');
+    //         return;
+    //     }
+    //     setSyncStatus('syncing');
+    //     try {
+    //         await restoreFromDrive((msg) => setSyncMessage(msg));
+    //         setSyncStatus('success');
+    //         setSyncMessage('Restore complete ✓');
+    //     } catch (e: any) {
+    //         setSyncStatus('error');
+    //         setSyncMessage(`Restore failed: ${e.message}`);
+    //     }
+    // }, []);
+
     const restore = useCallback(async () => {
+        console.log('RESTORE BUTTON CLICKED');
+
         if (!isDriveAuthenticated()) {
+            console.log('NOT AUTHENTICATED');
             setSyncStatus('error');
             setSyncMessage('Please sign in to Google first.');
             return;
         }
+
         setSyncStatus('syncing');
+
         try {
-            await restoreFromDrive((msg) => setSyncMessage(msg));
+            console.log('CALLING RESTOREFROMDRIVE');
+            await restoreFromDrive((msg) => {
+                console.log('PROGRESS:', msg);
+                setSyncMessage(msg);
+            });
+
+            console.log('RESTORE SUCCESS');
+
             setSyncStatus('success');
             setSyncMessage('Restore complete ✓');
         } catch (e: any) {
+            console.error('RESTORE ERROR', e);
+
             setSyncStatus('error');
             setSyncMessage(`Restore failed: ${e.message}`);
         }
