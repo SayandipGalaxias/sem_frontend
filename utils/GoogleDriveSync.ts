@@ -172,7 +172,8 @@ async function driveDownload(fileId: string): Promise<string> {
 }
 
 async function driveUpload(name: string, content: string): Promise<string> {
-    const boundary = 'ismart_boundary_xyz';
+    // const boundary = 'ismart_boundary_xyz';
+    const boundary = `----IsmartBoundary${Date.now()}`;
     const metadata = JSON.stringify({ name, parents: ['appDataFolder'] });
     const body =
         `--${boundary}\r\n` +
@@ -363,9 +364,20 @@ export async function backupToDrive(
     onProgress?.('Reading new / changed secrets…');
     const unsyncedSecrets = await SecretsApi.getUnsynced();
 
+    // onProgress?.('Merging secrets…');
+    // const secretMap = new Map<string, Secret>(existingSecrets.map(s => [s.id, s]));
+    // for (const s of unsyncedSecrets) secretMap.set(s.id, s);
+    // const mergedSecrets = Array.from(secretMap.values());
+
     onProgress?.('Merging secrets…');
-    const secretMap = new Map<string, Secret>(existingSecrets.map(s => [s.id, s]));
-    for (const s of unsyncedSecrets) secretMap.set(s.id, s);
+    const secretMap = new Map<string, Secret>(
+        existingSecrets
+            .filter(s => s.id && s.secret)
+            .map(s => [s.id, s])
+    );
+    for (const s of unsyncedSecrets) {
+        if (s.id && s.secret) secretMap.set(s.id, s);
+    }
     const mergedSecrets = Array.from(secretMap.values());
 
     onProgress?.('Reading contacts…');
@@ -420,10 +432,18 @@ export async function restoreFromDrive(
     onProgress?.('Decrypting backup…');
     let plaintext: string;
     try {
+        console.log('RAW LENGTH:', raw.length);
+        console.log('RAW STARTS WITH:', raw.slice(0, 50));
+        console.log('RAW ENDS WITH:', raw.slice(-50));
+        console.log('CHAR AT 458-462:', [...raw.slice(458, 462)].map(c => c.charCodeAt(0)));
         plaintext = await decryptPayload(raw, email);
     } catch (e) {
         throw new Error(`Decrypt failed: ${e}`);
     }
+
+    console.log('PLAINTEXT LENGTH:', plaintext.length);
+    console.log('PLAINTEXT STARTS WITH:', plaintext.slice(0, 80));
+    console.log('PLAINTEXT AROUND 460:', plaintext.slice(450, 470));
 
     const payload = JSON.parse(plaintext) as BackupPayload;
 

@@ -327,18 +327,35 @@ export class SecretsApi {
     }
 
 
+    // static async getUnsynced(): Promise<Secret[]> {
+    //     const email = SecretsApi.getEmail();
+    //     if (IS_NATIVE) {
+    //         const db = await getDb();
+    //         return db.getAllAsync<Secret>(
+    //             `SELECT id, name, description, secret FROM secrets WHERE email = ? AND synced = 0`,
+    //             [email],
+    //         );
+    //     }
+    //     return webReadRaw(email);
+    // }
+
     static async getUnsynced(): Promise<Secret[]> {
         const email = SecretsApi.getEmail();
         if (IS_NATIVE) {
             const db = await getDb();
-            return db.getAllAsync<Secret>(
+            const rows = await db.getAllAsync<Secret>(
                 `SELECT id, name, description, secret FROM secrets WHERE email = ? AND synced = 0`,
                 [email],
             );
+            return rows.map(r => ({
+                id: r.id ?? '',
+                name: r.name ?? '',
+                description: r.description ?? '',
+                secret: r.secret ?? '',
+            })).filter(r => r.id && r.secret);
         }
         return webReadRaw(email);
     }
-
 
     static async getAllRaw(): Promise<Secret[]> {
         const email = SecretsApi.getEmail();
