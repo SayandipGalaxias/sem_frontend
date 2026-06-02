@@ -1,3 +1,4 @@
+import { authenticateWithBiometrics } from '@/utils/biometric';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
@@ -22,19 +23,7 @@ import { Colors } from '../utils/colors';
 const TABLET_WIDTH = 768;
 const DESKTOP_WIDTH = 1100;
 
-const SecretItem = ({
-    item,
-    onDelete,
-    onEdit,
-    onView,
-    isTablet,
-}: {
-    item: Secret;
-    onDelete: (id: string) => void;
-    onEdit: (item: Secret) => void;
-    onView: (item: Secret) => void;
-    isTablet: boolean;
-}) => (
+const SecretItem = ({ item, onDelete, onEdit, onView, isTablet, }: { item: Secret; onDelete: (id: string) => void; onEdit: (item: Secret) => void; onView: (item: Secret) => void; isTablet: boolean; }) => (
     <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => onView(item)}
@@ -45,9 +34,18 @@ const SecretItem = ({
         </View>
 
         <View className="flex-1">
-            <Text className={`font-medium text-black dark:text-white ${isTablet ? 'text-[15px]' : 'text-[15px]'}`} numberOfLines={1}>
-                {item.name}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, }}>
+                <Text className={`font-medium text-black dark:text-white ${isTablet ? 'text-[15px]' : 'text-[15px]'}`} numberOfLines={1}>
+                    {item.name}
+                </Text>
+
+                {item.synced === 1 ? (
+                    <Ionicons name="cloud-done" size={14} color="#16a34a" />
+                ) : (
+                    <Ionicons name="cloud-offline" size={14} color="#f59e0b" />
+                )}
+            </View>
+
             <Text className="text-xs mt-0.5 text-gray-500 dark:text-gray-400" numberOfLines={1}>
                 {item.description}
             </Text>
@@ -451,7 +449,14 @@ export default function DashboardScreen() {
     );
 
     const displayedSecrets = searchText.trim()
-        ? secrets.filter((s) => s.name?.toLowerCase().includes(searchText.toLowerCase()))
+        ? secrets.filter((s) => {
+            const query = searchText.toLowerCase();
+
+            return (
+                s.name?.toLowerCase().includes(query) ||
+                s.description?.toLowerCase().includes(query)
+            );
+        })
         : secrets;
 
     const onDeletePress = (id: string) => {
@@ -472,8 +477,8 @@ export default function DashboardScreen() {
     };
 
     const onViewPress = async (item: Secret) => {
-        // const authenticated = await authenticateWithBiometrics('Authenticate to view secret');
-        // if (!authenticated) return;
+        const authenticated = await authenticateWithBiometrics('Authenticate to view secret');
+        if (!authenticated) return;
         router.push({
             pathname: '/(view)' as any,
             params: { id: item.id, name: item.name, secret: item.secret, description: item.description },
@@ -482,96 +487,108 @@ export default function DashboardScreen() {
 
     const handleCreateNew = () => router.push('/(create)' as any);
 
-    const ContentArea = () => (
-        <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-                paddingHorizontal: isDesktop ? 40 : isTablet ? 32 : 16,
-                paddingTop: isTablet ? 32 : 12,
-                paddingBottom: 40,
-                flexGrow: 1,
-            }}
-        >
-            <View
-                className={`flex-row items-center gap-2.5 bg-[#dce1ec] dark:bg-zinc-900 ${isTablet ? 'rounded-[18px] px-[18px] py-3.5 mb-6' : 'rounded-2xl px-3.5 py-2.5 mb-4'}`}
-                style={isTablet ? {
-                    shadowColor: '#000',
-                    shadowOpacity: 0.05,
-                    shadowRadius: 10,
-                    shadowOffset: { width: 0, height: 3 },
-                    elevation: 2,
-                } : undefined}
+    function ContentArea({
+        searchText,
+        setSearchText,
+        displayedSecrets,
+        loading,
+        isTablet,
+        isDesktop,
+        onDeletePress,
+        onEditPress,
+        onViewPress,
+    }: any) {
+        return (
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{
+                    paddingHorizontal: isDesktop ? 40 : isTablet ? 32 : 16,
+                    paddingTop: isTablet ? 32 : 12,
+                    paddingBottom: 40,
+                    flexGrow: 1,
+                }}
             >
-                <Ionicons name="search" size={isTablet ? 20 : 18} color="#4a6fa5" />
-                <TextInput
-                    value={searchText}
-                    onChangeText={setSearchText}
-                    placeholder="Search secrets…"
-                    placeholderTextColor="#8a93a6"
-                    className={`flex-1 text-black dark:text-white p-0 focus:outline-none ${isTablet ? 'text-[15px]' : 'text-sm'}`}
-                />
-                {searchText.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearchText('')} hitSlop={8}>
-                        <Ionicons name="close-circle" size={20} color="#8a93a6" />
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            {displayedSecrets.length > 0 && (
-                <Text
-                    className={`text-[11px] font-semibold text-[#8a93a6] uppercase tracking-[1.4px] ${isTablet ? 'mb-4' : 'mb-2.5'}`}
+                <View
+                    className={`flex-row items-center gap-2.5 bg-[#dce1ec] dark:bg-zinc-900 ${isTablet ? 'rounded-[18px] px-[18px] py-3.5 mb-6' : 'rounded-2xl px-3.5 py-2.5 mb-4'}`}
+                    style={isTablet ? {
+                        shadowColor: '#000',
+                        shadowOpacity: 0.05,
+                        shadowRadius: 10,
+                        shadowOffset: { width: 0, height: 3 },
+                        elevation: 2,
+                    } : undefined}
                 >
-                    {searchText.trim() ? 'Results' : 'Your secrets'} · {displayedSecrets.length}
-                </Text>
-            )}
-
-            {displayedSecrets.length === 0 ? (
-                <View className="items-center mt-[60px] gap-3">
-                    <View className="w-16 h-16 rounded-[22px] bg-[rgba(74,111,165,0.10)] items-center justify-center">
-                        <Ionicons name={loading ? 'hourglass-outline' : 'key-outline'} size={28} color="#4a6fa5" />
-                    </View>
-                    <Text className="text-[15px] font-semibold text-black dark:text-white">
-                        {loading ? 'Loading…' : searchText.trim() ? 'No results' : 'No secrets yet'}
-                    </Text>
-                    {!loading && !searchText.trim() && (
-                        <Text className="text-[13px] text-[#8a93a6] text-center leading-5 max-w-[240px]">
-                            Tap the + button to store your first encrypted secret.
-                        </Text>
+                    <Ionicons name="search" size={isTablet ? 20 : 18} color="#4a6fa5" />
+                    <TextInput
+                        value={searchText}
+                        onChangeText={setSearchText}
+                        placeholder="Search secrets…"
+                        placeholderTextColor="#8a93a6"
+                        className={`flex-1 text-black dark:text-white p-0 focus:outline-none ${isTablet ? 'text-[15px]' : 'text-sm'}`}
+                    />
+                    {searchText.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchText('')} hitSlop={8}>
+                            <Ionicons name="close-circle" size={20} color="#8a93a6" />
+                        </TouchableOpacity>
                     )}
                 </View>
-            ) : (
-                isTablet ? (
-                    <View className="gap-3 grid grid-cols-3">
-                        {displayedSecrets.map((item) => (
-                            <View
-                                key={item.id}
-                                style={{ width: '100%' }}
-                            >
-                                <SecretItem
-                                    item={item}
-                                    onDelete={onDeletePress}
-                                    onEdit={onEditPress}
-                                    onView={onViewPress}
-                                    isTablet={isTablet}
-                                />
-                            </View>
-                        ))}
+
+                {displayedSecrets.length > 0 && (
+                    <Text
+                        className={`text-[11px] font-semibold text-[#8a93a6] uppercase tracking-[1.4px] ${isTablet ? 'mb-4' : 'mb-2.5'}`}
+                    >
+                        {searchText.trim() ? 'Results' : 'Your secrets'} · {displayedSecrets.length}
+                    </Text>
+                )}
+
+                {displayedSecrets.length === 0 ? (
+                    <View className="items-center mt-[60px] gap-3">
+                        <View className="w-16 h-16 rounded-[22px] bg-[rgba(74,111,165,0.10)] items-center justify-center">
+                            <Ionicons name={loading ? 'hourglass-outline' : 'key-outline'} size={28} color="#4a6fa5" />
+                        </View>
+                        <Text className="text-[15px] font-semibold text-black dark:text-white">
+                            {loading ? 'Loading…' : searchText.trim() ? 'No results' : 'No secrets yet'}
+                        </Text>
+                        {!loading && !searchText.trim() && (
+                            <Text className="text-[13px] text-[#8a93a6] text-center leading-5 max-w-[240px]">
+                                Tap the + button to store your first encrypted secret.
+                            </Text>
+                        )}
                     </View>
                 ) : (
-                    displayedSecrets.map((item) => (
-                        <SecretItem
-                            key={item.id}
-                            item={item}
-                            onDelete={onDeletePress}
-                            onEdit={onEditPress}
-                            onView={onViewPress}
-                            isTablet={false}
-                        />
-                    ))
-                )
-            )}
-        </ScrollView>
-    );
+                    isTablet ? (
+                        <View className="gap-3 grid grid-cols-3">
+                            {displayedSecrets.map((item: Secret) => (
+                                <View
+                                    key={item.id}
+                                    style={{ width: '100%' }}
+                                >
+                                    <SecretItem
+                                        item={item}
+                                        onDelete={onDeletePress}
+                                        onEdit={onEditPress}
+                                        onView={onViewPress}
+                                        isTablet={isTablet}
+                                    />
+                                </View>
+                            ))}
+                        </View>
+                    ) : (
+                        displayedSecrets.map((item: Secret) => (
+                            <SecretItem
+                                key={item.id}
+                                item={item}
+                                onDelete={onDeletePress}
+                                onEdit={onEditPress}
+                                onView={onViewPress}
+                                isTablet={false}
+                            />
+                        ))
+                    )
+                )}
+            </ScrollView>
+        );
+    }
 
     return (
         <View className="bg-[#e8ecf4] dark:bg-black flex-1">
@@ -591,7 +608,17 @@ export default function DashboardScreen() {
                             onBackup={() => router.push('/(backup)' as any)}
                         />
                         <View style={{ flex: 1, overflow: 'hidden' }}>
-                            <ContentArea />
+                            <ContentArea
+                                searchText={searchText}
+                                setSearchText={setSearchText}
+                                displayedSecrets={displayedSecrets}
+                                loading={loading}
+                                isTablet={isTablet}
+                                isDesktop={isDesktop}
+                                onDeletePress={onDeletePress}
+                                onEditPress={onEditPress}
+                                onViewPress={onViewPress}
+                            />
                         </View>
                     </View>
                 ) : (
@@ -636,7 +663,17 @@ export default function DashboardScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <ContentArea />
+                        <ContentArea
+                            searchText={searchText}
+                            setSearchText={setSearchText}
+                            displayedSecrets={displayedSecrets}
+                            loading={loading}
+                            isTablet={isTablet}
+                            isDesktop={isDesktop}
+                            onDeletePress={onDeletePress}
+                            onEditPress={onEditPress}
+                            onViewPress={onViewPress}
+                        />
 
                         <Drawer
                             email={user?.email}

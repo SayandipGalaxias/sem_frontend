@@ -3,6 +3,7 @@ export interface Secret {
     name: string;
     secret: string;
     description: string;
+    synced?: number;
 }
 
 export interface AddSecretRequest {

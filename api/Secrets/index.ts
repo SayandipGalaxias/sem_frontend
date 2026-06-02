@@ -136,7 +136,7 @@ export class SecretsApi {
         if (IS_NATIVE) {
             rows = await withDb(db =>
                 db.getAllAsync<Secret>(
-                    `SELECT id, name, description, secret FROM secrets WHERE email = ? ORDER BY updated_at ASC`,
+                    `SELECT id, name, description, secret, synced FROM secrets WHERE email = ? ORDER BY updated_at ASC`,
                     [email],
                 ),
             );
@@ -147,8 +147,11 @@ export class SecretsApi {
         const decrypted: Secret[] = await Promise.all(
             rows.map(async (row) => ({
                 ...row,
-                secret: await Utility.decryptSecretWithKey(row.secret, encryptionKey),
-            })),
+                secret: await Utility.decryptSecretWithKey(
+                    row.secret,
+                    encryptionKey,
+                ),
+            }))
         );
 
         return { data: { data: { secrets: decrypted } } };
@@ -181,6 +184,7 @@ export class SecretsApi {
                 name: payload.name ?? '',
                 description: payload.description ?? '',
                 secret: encryptedSecret,
+                synced: 0,
             });
             await webWriteRaw(email, list);
         }
@@ -233,6 +237,7 @@ export class SecretsApi {
                 ...(payload.name !== undefined && { name: payload.name }),
                 ...(payload.description !== undefined && { description: payload.description }),
                 secret: encryptedSecret,
+                synced: 0,
             };
             await webWriteRaw(email, list);
         }
@@ -244,7 +249,7 @@ export class SecretsApi {
         if (IS_NATIVE) {
             const rows = await withDb(db =>
                 db.getAllAsync<Secret>(
-                    `SELECT id, name, description, secret FROM secrets WHERE email = ? AND synced = 0`,
+                    `SELECT id, name, description, secret, synced FROM secrets WHERE email = ? AND synced = 0`,
                     [email],
                 ),
             );
@@ -267,7 +272,7 @@ export class SecretsApi {
         if (IS_NATIVE) {
             return withDb(db =>
                 db.getAllAsync<Secret>(
-                    `SELECT id, name, description, secret FROM secrets WHERE email = ?`,
+                    `SELECT id, name, description, secret, synced FROM secrets WHERE email = ?`,
                     [email],
                 ),
             );
@@ -276,15 +281,42 @@ export class SecretsApi {
         return webReadRaw(email);
     }
 
-    static async markSynced(ids: string[]): Promise<void> {
-        if (!ids.length || !IS_NATIVE) return;
+    // static async markSynced(ids: string[]): Promise<void> {
+    //     if (!ids.length || !IS_NATIVE) return;
 
-        await withDb(async (db) => {
-            for (const id of ids) {
-                if (!id) continue;
-                await db.runAsync(`UPDATE secrets SET synced = 1 WHERE id = ?`, [id]);
-            }
-        });
+    //     await withDb(async (db) => {
+    //         for (const id of ids) {
+    //             if (!id) continue;
+    //             await db.runAsync(`UPDATE secrets SET synced = 1 WHERE id = ?`, [id]);
+    //         }
+    //     });
+    // }
+
+    static async markSynced(ids: string[]): Promise<void> {
+        if (!ids.length) return;
+
+        if (IS_NATIVE) {
+            await withDb(async (db) => {
+                for (const id of ids) {
+                    await db.runAsync(
+                        `UPDATE secrets SET synced = 1 WHERE id = ?`,
+                        [id]
+                    );
+                }
+            });
+
+            return;
+        }
+
+        const email = SecretsApi.getEmail();
+        const list = await webReadRaw(email);
+
+        const updated = list.map(secret => ({
+            ...secret,
+            synced: ids.includes(secret.id) ? 1 : secret.synced,
+        }));
+
+        await webWriteRaw(email, updated);
     }
 
     static async bulkUpsert(secrets: Secret[]): Promise<void> {
@@ -307,7 +339,12 @@ export class SecretsApi {
                 });
             });
         } else {
-            await webWriteRaw(email, secrets);
+            const syncedSecrets = secrets.map(secret => ({
+                ...secret,
+                synced: 1,
+            }));
+
+            await webWriteRaw(email, syncedSecrets);
         }
     }
 
