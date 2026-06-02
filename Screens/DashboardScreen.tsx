@@ -1,4 +1,3 @@
-import { authenticateWithBiometrics } from '@/utils/biometric';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
@@ -473,8 +472,8 @@ export default function DashboardScreen() {
     };
 
     const onViewPress = async (item: Secret) => {
-        const authenticated = await authenticateWithBiometrics('Authenticate to view secret');
-        if (!authenticated) return;
+        // const authenticated = await authenticateWithBiometrics('Authenticate to view secret');
+        // if (!authenticated) return;
         router.push({
             pathname: '/(view)' as any,
             params: { id: item.id, name: item.name, secret: item.secret, description: item.description },

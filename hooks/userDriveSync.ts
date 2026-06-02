@@ -108,24 +108,6 @@ export function useDriveSync() {
         }
     }, [refreshBackupInfo]);
 
-
-    // const restore = useCallback(async () => {
-    //     if (!isDriveAuthenticated()) {
-    //         setSyncStatus('error');
-    //         setSyncMessage('Please sign in to Google first.');
-    //         return;
-    //     }
-    //     setSyncStatus('syncing');
-    //     try {
-    //         await restoreFromDrive((msg) => setSyncMessage(msg));
-    //         setSyncStatus('success');
-    //         setSyncMessage('Restore complete ✓');
-    //     } catch (e: any) {
-    //         setSyncStatus('error');
-    //         setSyncMessage(`Restore failed: ${e.message}`);
-    //     }
-    // }, []);
-
     const restore = useCallback(async () => {
         console.log('RESTORE BUTTON CLICKED');
 

@@ -6,12 +6,16 @@ import * as aesjs from 'aes-js';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
+import { SecretsApi } from '../api/Secrets';
 import type { Secret } from '../api/Secrets/types';
 import type { AppContact } from '../interfaces/Contacts';
 
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_WEB_CLIENT_ID;
 const ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_ANDROID_CLIENT_ID;
 const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_IOS_CLIENT_ID;
+const IOS_REDIRECT_URI = process.env.EXPO_PUBLIC_IOS_REDIRECT_URI;
+const ANDROID_REDIRECT_URI = process.env.EXPO_PUBLIC_ANDROID_REDIRECT_URI;
+const WEB_CLIENT_SECRET = process.env.EXPO_PUBLIC_WEB_CLIENT_SECRET;
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -20,11 +24,13 @@ const SCOPES = [
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email',
 ];
+
 const BACKUP_FILE_NAME = 'ismart_backup.json';
 const MANIFEST_FILE_NAME = 'ismart_manifest.json';
 const BACKUP_SALT = 'ismart-backup-salt-v1';
 const ASYNC_KEY_DRIVE_USER = '@ismart/drive_user';
 const ASYNC_KEY_ACCESS_TOKEN = '@ismart/drive_access_token';
+
 
 export interface DriveUser {
     email: string;
@@ -36,7 +42,7 @@ export interface BackupPayload {
     ts: number;
     secrets: Secret[];
     contacts: AppContact[];
-    randomStringEncrypted: string;
+    randomString: string;
 }
 
 export interface BackupInfo {
@@ -49,38 +55,89 @@ export interface BackupInfo {
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
+
 let _accessToken: string | null = null;
 let _driveUser: DriveUser | null = null;
 
+
 function getSubtle(): SubtleCrypto | null {
-    console.log('globalThis.crypto', !!globalThis?.crypto);
-    console.log('globalThis.crypto.subtle', !!globalThis?.crypto?.subtle);
-
-    console.log('window.crypto', typeof window !== 'undefined' ? !!window.crypto : 'no window');
-    console.log(
-        'window.crypto.subtle',
-        typeof window !== 'undefined'
-            ? !!window.crypto?.subtle
-            : 'no window'
-    );
-
-    return globalThis?.crypto?.subtle ??
-        window?.crypto?.subtle ??
-        null;
+    return globalThis?.crypto?.subtle ?? (typeof window !== 'undefined' ? window?.crypto?.subtle : null) ?? null;
 }
 
 function isWeb(): boolean {
     try {
         return (
             typeof window !== 'undefined' &&
-            typeof window.location !== 'undefined' &&
-            typeof window.location.protocol === 'string' &&
+            typeof window.location?.protocol === 'string' &&
             window.location.protocol.startsWith('http') &&
             getSubtle() !== null
         );
     } catch {
         return false;
     }
+}
+
+async function sha256Native(data: Uint8Array): Promise<Uint8Array> {
+    const hex = Array.from(data).map(b => b.toString(16).padStart(2, '0')).join('');
+    const hashHex = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        hex,
+        { encoding: Crypto.CryptoEncoding.HEX },
+    );
+    return new Uint8Array((hashHex.match(/.{1,2}/g) as string[]).map(b => parseInt(b, 16)));
+}
+
+async function deriveBackupKeyNative(email: string): Promise<Uint8Array> {
+    let key = new TextEncoder().encode(email + BACKUP_SALT);
+    for (let i = 0; i < 1000; i++) key = await sha256Native(key);
+    return key;
+}
+
+async function encryptPayloadNative(plaintext: string, email: string): Promise<string> {
+    const key = await deriveBackupKeyNative(email);
+    const iv = await Crypto.getRandomBytesAsync(16);
+    const keyArr = Array.from(key);
+    const ivArr = Array.from(iv);
+
+    const textBytes = aesjs.utils.utf8.toBytes(plaintext);
+    const pad = 16 - (textBytes.length % 16);
+    const padded = new Uint8Array(textBytes.length + pad);
+    padded.set(textBytes);
+    padded.fill(pad, textBytes.length);
+
+    const aesCbc = new aesjs.ModeOfOperation.cbc(keyArr, ivArr);
+    const encrypted = aesCbc.encrypt(Array.from(padded));
+
+    return JSON.stringify({
+        cipher: aesjs.utils.hex.fromBytes(encrypted),
+        iv: aesjs.utils.hex.fromBytes(ivArr),
+        web: false,
+    });
+}
+
+async function decryptPayloadNative(encryptedJson: string, email: string): Promise<string> {
+    const trimmed = encryptedJson.trim();
+    if (!trimmed.startsWith('{')) throw new Error(`Expected JSON but got: "${trimmed.slice(0, 80)}"`);
+
+    const key = await deriveBackupKeyNative(email);
+    const keyArr = Array.from(key);
+    const parsed: { cipher: string; iv: string } = JSON.parse(trimmed);
+    const ivArr = Array.from(aesjs.utils.hex.toBytes(parsed.iv));
+    const cipherArr = Array.from(aesjs.utils.hex.toBytes(parsed.cipher));
+
+    const aesCbc = new aesjs.ModeOfOperation.cbc(keyArr, ivArr);
+    const decrypted = aesCbc.decrypt(cipherArr);
+    const padLen = decrypted[decrypted.length - 1];
+
+    return aesjs.utils.utf8.fromBytes(decrypted.slice(0, decrypted.length - padLen));
+}
+
+async function encryptPayload(plaintext: string, email: string): Promise<string> {
+    return encryptPayloadNative(plaintext, email);
+}
+
+async function decryptPayload(encryptedJson: string, email: string): Promise<string> {
+    return decryptPayloadNative(encryptedJson, email);
 }
 
 
@@ -125,6 +182,7 @@ async function driveUpload(name: string, content: string): Promise<string> {
         `Content-Type: application/json\r\n\r\n` +
         `${content}\r\n` +
         `--${boundary}--`;
+
     const res = await fetch(
         'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
         {
@@ -170,109 +228,11 @@ async function driveUpsert(name: string, content: string): Promise<string> {
 }
 
 
-async function sha256Native(data: Uint8Array): Promise<Uint8Array> {
-    const hex = Array.from(data)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-
-    const hashHex = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        hex,
-        { encoding: Crypto.CryptoEncoding.HEX }
-    );
-    return new Uint8Array((hashHex.match(/.{1,2}/g) as string[]).map(b => parseInt(b, 16)));
-}
-
-async function deriveBackupKeyNative(email: string): Promise<Uint8Array> {
-    let key = new TextEncoder().encode(email + BACKUP_SALT);
-    for (let i = 0; i < 1000; i++) {
-        key = await sha256Native(key);
-    }
-    return key;
-}
-
-async function encryptPayloadNative(plaintext: string, email: string): Promise<string> {
-    const key = await deriveBackupKeyNative(email);
-    const iv = await Crypto.getRandomBytesAsync(16);
-    const keyArr = Array.from(key);
-    const ivArr = Array.from(iv);
-    const textBytes = aesjs.utils.utf8.toBytes(plaintext);
-    const pad = 16 - (textBytes.length % 16);
-    const padded = new Uint8Array(textBytes.length + pad);
-    padded.set(textBytes);
-    padded.fill(pad, textBytes.length);
-    const aesCbc = new aesjs.ModeOfOperation.cbc(keyArr, ivArr);
-    const encrypted = aesCbc.encrypt(Array.from(padded));
-    return JSON.stringify({
-        cipher: aesjs.utils.hex.fromBytes(encrypted),
-        iv: aesjs.utils.hex.fromBytes(ivArr),
-        web: false,
-    });
-}
-
-async function decryptPayloadNative(encryptedJson: string, email: string): Promise<string> {
-    const trimmed = encryptedJson.trim();
-    if (!trimmed.startsWith('{')) {
-        throw new Error(`Expected JSON but got: "${trimmed.slice(0, 80)}"`);
-    }
-    const key = await deriveBackupKeyNative(email);
-    const keyArr = Array.from(key);
-    const parsed: { cipher: string; iv: string; web?: boolean } = JSON.parse(trimmed);
-    const ivArr = Array.from(aesjs.utils.hex.toBytes(parsed.iv));
-    const cipherArr = Array.from(aesjs.utils.hex.toBytes(parsed.cipher));
-    const aesCbc = new aesjs.ModeOfOperation.cbc(keyArr, ivArr);
-    const decrypted = aesCbc.decrypt(cipherArr);
-    const padLen = decrypted[decrypted.length - 1];
-    return aesjs.utils.utf8.fromBytes(decrypted.slice(0, decrypted.length - padLen));
-}
-
-async function deriveBackupKeyWeb(email: string): Promise<CryptoKey> {
-    const subtle = getSubtle();
-    if (!subtle) throw new Error('SubtleCrypto not available');
-    const raw = new TextEncoder().encode(email + BACKUP_SALT);
-    const keyMaterial = await subtle.importKey(
-        'raw', raw, { name: 'PBKDF2' }, false, ['deriveKey'],
-    );
-    return subtle.deriveKey(
-        {
-            name: 'PBKDF2',
-            salt: new TextEncoder().encode(email),
-            iterations: 1000,
-            hash: 'SHA-256',
-        },
-        keyMaterial,
-        { name: 'AES-CBC', length: 256 },
-        false,
-        ['encrypt', 'decrypt'],
-    );
-}
-
-
-async function encryptPayload(
-    plaintext: string,
-    email: string,
-): Promise<string> {
-    return encryptPayloadNative(plaintext, email);
-}
-
-async function decryptPayload(
-    encryptedJson: string,
-    email: string,
-): Promise<string> {
-    return decryptPayloadNative(encryptedJson, email);
-}
-
-
-const IOS_REDIRECT_URI = process.env.EXPO_PUBLIC_IOS_REDIRECT_URI;
-const ANDROID_REDIRECT_URI = process.env.EXPO_PUBLIC_ANDROID_REDIRECT_URI;
-const WEB_CLIENT_SECRET = process.env.EXPO_PUBLIC_WEB_CLIENT_SECRET;
-
 export async function signInWithGoogle(): Promise<DriveUser> {
     if (isWeb()) {
         const state = Math.random().toString(36).substring(2);
-        sessionStorage.setItem('oauth_state', state);
-
         const redirectUri = window.location.origin + '/oauth-callback';
+        sessionStorage.setItem('oauth_state', state);
         sessionStorage.setItem('oauth_redirect_uri', redirectUri);
 
         const authUrl =
@@ -291,7 +251,6 @@ export async function signInWithGoogle(): Promise<DriveUser> {
     const isIos = Platform.OS === 'ios';
     const clientId = isIos ? IOS_CLIENT_ID : WEB_CLIENT_ID;
     const redirectUri = isIos ? IOS_REDIRECT_URI : ANDROID_REDIRECT_URI;
-
     const state = Math.random().toString(36).substring(2);
 
     const authUrl =
@@ -304,19 +263,16 @@ export async function signInWithGoogle(): Promise<DriveUser> {
         `&access_type=online`;
 
     const result = await WebBrowser.openAuthSessionAsync(authUrl, 'ismart-manager://');
-
     if (result.type !== 'success') {
         throw new Error(
             result.type === 'cancel' ? 'Sign-in cancelled' : `Sign-in failed: ${result.type}`,
         );
     }
 
-    const returnUrl = result.url;
-    const queryString = returnUrl.includes('?') ? returnUrl.split('?')[1] : '';
+    const queryString = result.url.includes('?') ? result.url.split('?')[1] : '';
     const params = Object.fromEntries(
         queryString.split('&').map(p => p.split('=').map(decodeURIComponent)),
     );
-
     if (!params.code) throw new Error('No authorization code returned');
 
     const tokenBody = [
@@ -325,21 +281,15 @@ export async function signInWithGoogle(): Promise<DriveUser> {
         `redirect_uri=${encodeURIComponent(redirectUri!)}`,
         `grant_type=authorization_code`,
     ];
-
-    if (!isIos) {
-        tokenBody.push(`client_secret=${encodeURIComponent(WEB_CLIENT_SECRET!)}`);
-    }
+    if (!isIos) tokenBody.push(`client_secret=${encodeURIComponent(WEB_CLIENT_SECRET!)}`);
 
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: tokenBody.join('&'),
     });
-
     const tokenJson = await tokenRes.json();
-    if (!tokenJson.access_token) {
-        throw new Error(`Token exchange failed: ${JSON.stringify(tokenJson)}`);
-    }
+    if (!tokenJson.access_token) throw new Error(`Token exchange failed: ${JSON.stringify(tokenJson)}`);
 
     _accessToken = tokenJson.access_token;
 
@@ -347,10 +297,7 @@ export async function signInWithGoogle(): Promise<DriveUser> {
         headers: { Authorization: `Bearer ${_accessToken}` },
     });
     const profile = await profileRes.json();
-    _driveUser = {
-        email: profile.email ?? 'unknown',
-        name: profile.name ?? profile.given_name ?? undefined,
-    };
+    _driveUser = { email: profile.email ?? 'unknown', name: profile.name ?? profile.given_name };
 
     await AsyncStorage.setItem(ASYNC_KEY_ACCESS_TOKEN, _accessToken!);
     await AsyncStorage.setItem(ASYNC_KEY_DRIVE_USER, JSON.stringify(_driveUser));
@@ -380,14 +327,8 @@ export async function signOutFromDrive(): Promise<void> {
     await AsyncStorage.removeItem(ASYNC_KEY_DRIVE_USER);
 }
 
-export function getDriveUser(): DriveUser | null {
-    return _driveUser;
-}
-
-export function isDriveAuthenticated(): boolean {
-    return Boolean(_accessToken);
-}
-
+export function getDriveUser(): DriveUser | null { return _driveUser; }
+export function isDriveAuthenticated(): boolean { return Boolean(_accessToken); }
 
 export async function backupToDrive(
     onProgress?: (msg: string) => void,
@@ -400,41 +341,61 @@ export async function backupToDrive(
     const randomString = useEncryptionStore.getState().randomString;
     if (!randomString) throw new Error('Encryption key not loaded.');
 
-    onProgress?.('Reading secrets…');
-    const secretsJson = await AsyncStorage.getItem(
-        `secrets_${email.replace(/[^a-zA-Z0-9_]/g, '_')}`,
-    );
-    const secrets: Secret[] = secretsJson ? JSON.parse(secretsJson) : [];
+    onProgress?.('Fetching existing backup…');
+    let existingSecrets: Secret[] = [];
+    let existingContacts: AppContact[] = [];
+    let version = 1;
+
+    try {
+        const backupFiles = await driveList(BACKUP_FILE_NAME);
+        if (backupFiles.length > 0) {
+            const raw = await driveDownload(backupFiles[0].id);
+            const plaintext = await decryptPayload(raw, email);
+            const payload = JSON.parse(plaintext) as BackupPayload;
+            existingSecrets = payload.secrets ?? [];
+            existingContacts = payload.contacts ?? [];
+            version = (payload.version ?? 0) + 1;
+        }
+    } catch (_) {
+        // No existing backup - start fresh
+    }
+
+    onProgress?.('Reading new / changed secrets…');
+    const unsyncedSecrets = await SecretsApi.getUnsynced();
+
+    onProgress?.('Merging secrets…');
+    const secretMap = new Map<string, Secret>(existingSecrets.map(s => [s.id, s]));
+    for (const s of unsyncedSecrets) secretMap.set(s.id, s);
+    const mergedSecrets = Array.from(secretMap.values());
 
     onProgress?.('Reading contacts…');
     const contactsJson = await AsyncStorage.getItem(`@contacts_${email}`);
-    const contacts: AppContact[] = contactsJson ? JSON.parse(contactsJson) : [];
-
-    let version = 1;
-    try {
-        const manifestFiles = await driveList(MANIFEST_FILE_NAME);
-        if (manifestFiles.length > 0) {
-            const raw = await driveDownload(manifestFiles[0].id);
-            const manifest = JSON.parse(raw);
-            version = (manifest.version ?? 0) + 1;
-        }
-    } catch (_) { }
+    const contacts: AppContact[] = contactsJson ? JSON.parse(contactsJson) : existingContacts;
 
     onProgress?.('Encrypting backup…');
-    const plaintext = JSON.stringify({ version, ts: Date.now(), secrets, contacts, randomString });
-    const encryptedContent = await encryptPayload(plaintext, email);
+    const payload: BackupPayload = {
+        version,
+        ts: Date.now(),
+        secrets: mergedSecrets,
+        contacts,
+        randomString,
+    };
+    const encryptedContent = await encryptPayload(JSON.stringify(payload), email);
 
     onProgress?.('Uploading to Google Drive…');
     await driveUpsert(BACKUP_FILE_NAME, encryptedContent);
 
-    const manifest = {
+    const manifest: BackupInfo = {
         version,
         ts: Date.now(),
-        secretCount: secrets.length,
+        secretCount: mergedSecrets.length,
         contactCount: contacts.length,
         fileSize: encryptedContent.length,
     };
     await driveUpsert(MANIFEST_FILE_NAME, JSON.stringify(manifest));
+
+    onProgress?.('Marking secrets as synced…');
+    await SecretsApi.markSynced(unsyncedSecrets.map(s => s.id));
 
     onProgress?.('Backup complete ✓');
     return manifest;
@@ -443,7 +404,6 @@ export async function backupToDrive(
 export async function restoreFromDrive(
     onProgress?: (msg: string) => void,
 ): Promise<void> {
-    
     console.log('RESTORE START');
     if (!isDriveAuthenticated()) throw new Error('Not signed in to Google Drive.');
 
@@ -465,13 +425,7 @@ export async function restoreFromDrive(
         throw new Error(`Decrypt failed: ${e}`);
     }
 
-    const payload = JSON.parse(plaintext) as {
-        version: number;
-        ts: number;
-        secrets: Secret[];
-        contacts: AppContact[];
-        randomString: string;
-    };
+    const payload = JSON.parse(plaintext) as BackupPayload;
 
     console.log('RESTORE PAYLOAD');
     console.log('secrets:', payload.secrets?.length);
@@ -482,15 +436,10 @@ export async function restoreFromDrive(
     await useEncryptionStore.getState().saveRandomString(email, payload.randomString);
 
     onProgress?.('Restoring secrets…');
-    const secretsKey = `secrets_${email.replace(/[^a-zA-Z0-9_]/g, '_')}`;
-    await AsyncStorage.setItem(secretsKey, JSON.stringify(payload.secrets));
-
-    const verifySecrets = await AsyncStorage.getItem(secretsKey);
-
-    console.log(
-        'saved secrets',
-        JSON.parse(verifySecrets || '[]').length
-    );
+    if (payload.secrets?.length) {
+        await SecretsApi.bulkUpsert(payload.secrets);
+    }
+    console.log('Restored secrets into SQLite:', payload.secrets?.length ?? 0);
 
     onProgress?.('Restoring contacts…');
     if (payload.contacts?.length) {
@@ -501,6 +450,7 @@ export async function restoreFromDrive(
     onProgress?.('Restore complete ✓');
     console.log('RESTORE COMPLETE');
 }
+
 
 export async function getBackupInfo(): Promise<BackupInfo | null> {
     if (!isDriveAuthenticated()) return null;
@@ -516,7 +466,9 @@ export async function getBackupInfo(): Promise<BackupInfo | null> {
 
 export async function deleteAllBackupFiles(): Promise<void> {
     const files = await driveList(BACKUP_FILE_NAME);
-    for (const f of files) await driveDelete(f.id);
     const manifests = await driveList(MANIFEST_FILE_NAME);
-    for (const f of manifests) await driveDelete(f.id);
+    await Promise.all([
+        ...files.map(f => driveDelete(f.id)),
+        ...manifests.map(f => driveDelete(f.id)),
+    ]);
 }
