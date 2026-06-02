@@ -198,7 +198,7 @@ export default function ContactsScreen() {
                 )}
             </View>
 
-            <View className="px-5">
+            <View className="px-5 pb-5">
                 <View className="flex-row items-center bg-[#dce1ec] dark:bg-zinc-900 rounded-2xl px-4 py-3">
                     <Ionicons
                         name="search"
@@ -211,7 +211,7 @@ export default function ContactsScreen() {
                         onChangeText={setSearch}
                         placeholder="Search contacts..."
                         placeholderTextColor="#8a93a6"
-                        className="flex-1 ml-3 text-black dark:text-white"
+                        className="flex-1 ml-3 text-black dark:text-white focus:outline-none"
                     />
                 </View>
             </View>
